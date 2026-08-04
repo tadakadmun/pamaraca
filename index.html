@@ -219,7 +219,7 @@
       <label>ชื่ออุปกรณ์/รายการ <input type="text" id="modalName" placeholder="เช่น ท่อ HDPE 100 ชั้น PN 6 Dia 110 มม."></label>
     </div>
     <div id="modalLinkSection" style="display:none;margin-top:10px;">
-      <label>ค้นหารหัส/รายการ <input type="text" id="modalSearch" placeholder="พิมพ์เพื่อค้นหา..."></label>
+      <label>พิมพ์ชื่อ/รหัส (ไม่ต้องระบุขนาด ระบบจะโชว์ทุกขนาดให้เลือก) <input type="text" id="modalSearch" placeholder="เช่น HDPE 100 PN6"></label>
       <div id="modalSearchResults" style="max-height:220px;overflow:auto;margin-top:6px;"></div>
     </div>
     <div class="row" style="margin-top:16px;">
@@ -390,11 +390,15 @@ function openSymbolModal(dataURL, w, h){
     document.getElementById('modalName').value = '';
     document.getElementById('modalSearch').value = '';
     document.getElementById('modalSearchResults').innerHTML = '';
-    switchModalTab('manual');
+    const defaultTab = priceList.length>0 ? 'link' : 'manual';
+    switchModalTab(defaultTab);
     symbolModalOverlay.dataset.w = w;
     symbolModalOverlay.dataset.h = h;
     symbolModalOverlay.dataset.dataURL = dataURL;
     symbolModalOverlay.style.display = 'flex';
+    if(defaultTab==='link'){
+      setTimeout(()=>document.getElementById('modalSearch').focus(), 60);
+    }
   });
 }
 function switchModalTab(tab){
