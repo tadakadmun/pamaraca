@@ -83,6 +83,7 @@
 </script>
 <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
 <header>
   <div>
@@ -211,6 +212,11 @@
     <div class="hint">ดูตัวอย่างข้อมูลด้านล่าง แล้วระบุว่าคอลัมน์ไหน (A, B, C, ...) ตรงกับอะไร — จะนำเข้าเฉพาะแถวที่มีข้อมูลในคอลัมน์ "รหัส" เท่านั้น</div>
     <div id="previewTableWrap" style="overflow:auto;max-height:260px;margin-top:8px;border:1px solid var(--border);border-radius:8px;"></div>
     <button id="btnConfirmImport" style="margin-top:10px;">✅ นำเข้าเป็นฐานข้อมูลราคา</button>
+
+    <div class="divider"></div>
+    <div class="hint">📷 ถ้าไฟล์นี้มีรูปสัญลักษณ์ฝังอยู่ในเซลล์ (เหมือนคอลัมน์ "สัญลักษณ์" ในไฟล์ ปร.1 ของคุณ) กดปุ่มนี้เพื่อดึงรูปออกมาทั้งหมด แล้วเลือกผูกกับรหัสได้เลย ไม่ต้องไปแคป/ครอปเอง</div>
+    <button class="secondary" id="btnExtractImages" style="margin-top:8px;">📷 ดึงรูปสัญลักษณ์จากไฟล์นี้</button>
+    <div id="extractedImagesWrap" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;"></div>
   </div>
 </div>
 
@@ -1327,7 +1333,7 @@ function stopContinuous(){
 }
 
 /* ============ Excel price/code database import ============ */
-let importedWorkbook = null, currentSheetData = [];
+let importedWorkbook = null, currentSheetData = [], importedFileBuffer = null;
 
 document.getElementById('btnImportExcel').onclick = ()=> document.getElementById('fileExcelImport').click();
 document.getElementById('fileExcelImport').onchange = (e)=>{
@@ -1335,11 +1341,13 @@ document.getElementById('fileExcelImport').onchange = (e)=>{
   if(!file) return;
   const reader = new FileReader();
   reader.onload = (ev)=>{
+    importedFileBuffer = ev.target.result; // keep raw buffer for image extraction (JSZip) too
     const data = new Uint8Array(ev.target.result);
     importedWorkbook = XLSX.read(data, {type:'array'});
     const sheetSelect = document.getElementById('sheetSelect');
     sheetSelect.innerHTML = importedWorkbook.SheetNames.map(n=>`<option value="${n}">${n}</option>`).join('');
     document.getElementById('importMapping').style.display='block';
+    document.getElementById('extractedImagesWrap').innerHTML = '';
     renderExcelPreview();
   };
   reader.readAsArrayBuffer(file);
@@ -1383,6 +1391,40 @@ function renderExcelPreview(){
   html += '</tbody></table>';
   document.getElementById('previewTableWrap').innerHTML = html;
 }
+
+/* ---- Extract embedded images (e.g. a "สัญลักษณ์" column) straight out of the xlsx file ---- */
+document.getElementById('btnExtractImages').onclick = async ()=>{
+  if(!importedFileBuffer){ alert('กรุณาเลือกไฟล์ Excel ก่อน'); return; }
+  const wrap = document.getElementById('extractedImagesWrap');
+  wrap.innerHTML = '<div class="empty">กำลังดึงรูป...</div>';
+  try{
+    const zip = await JSZip.loadAsync(importedFileBuffer);
+    const mediaFiles = Object.keys(zip.files).filter(name => /^xl\/media\//i.test(name) && !zip.files[name].dir);
+    if(mediaFiles.length===0){
+      wrap.innerHTML = '<div class="empty">ไม่พบรูปภาพฝังอยู่ในไฟล์นี้</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    for(const path of mediaFiles){
+      const blob = await zip.files[path].async('blob');
+      const dataURL = await new Promise(res=>{
+        const r = new FileReader();
+        r.onload = ev=>res(ev.target.result);
+        r.readAsDataURL(blob);
+      });
+      const cell = document.createElement('div');
+      cell.style.cssText = 'text-align:center;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px;';
+      cell.innerHTML = `<img src="${dataURL}" style="width:100%;height:60px;object-fit:contain;background:#fff;border-radius:4px;"><button class="secondary" style="margin-top:6px;width:100%;font-size:10px;padding:4px;">➕ เพิ่ม</button>`;
+      cell.querySelector('button').onclick = async ()=>{
+        const img = await loadImage(dataURL);
+        await addSymbolFromDataURL(dataURL, img.width, img.height);
+      };
+      wrap.appendChild(cell);
+    }
+  }catch(err){
+    wrap.innerHTML = `<div class="empty">ดึงรูปไม่สำเร็จ: ${err.message}</div>`;
+  }
+};
 
 document.getElementById('btnConfirmImport').onclick = async ()=>{
   const codeIdx = colLetterToIndex(document.getElementById('colCode').value);
