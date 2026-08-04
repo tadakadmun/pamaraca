@@ -278,11 +278,27 @@
   </div>
 </div>
 
-<!-- Item bundle editor modal -->
+<!-- Item settings modal (bundle + size-by-zone) -->
 <div class="modal-overlay" id="bundleModalOverlay">
   <div class="modal-box" style="width:460px;">
-    <h3>🧩 ชุดรายการเพิ่มเติม</h3>
+    <h3>⚙️ ตั้งค่าสัญลักษณ์</h3>
     <div class="hint" id="bundleModalSubtitle"></div>
+
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:0;">
+        <input type="checkbox" id="bundleSizeVariable" style="width:auto;margin:0;">
+        <span>🔧 ขนาดของอุปกรณ์นี้แปรผันตามโซนขนาดในภาพ (ค้นรหัสให้ตรงขนาดอัตโนมัติ)</span>
+      </label>
+      <div id="bundlePatternWrap" style="display:none;margin-top:8px;">
+        <label>คำค้นหลัก (ชื่อแบบไม่ระบุขนาด เช่น "ท่อ HDPE100 ชั้น PN6")
+          <input type="text" id="bundleNamePattern">
+        </label>
+        <div class="hint">ตอนวิเคราะห์ ถ้าสัญลักษณ์นี้ตกอยู่ในโซนขนาดไหน ระบบจะค้นตารางราคาด้วย "คำค้นหลัก + ขนาดของโซน" แล้วใช้รหัสที่เจอแทนรหัสเดิมอัตโนมัติ ถ้าไม่พบโซนหรือไม่พบรหัสตรง จะใช้รหัสเริ่มต้นของสัญลักษณ์แทน</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="hint">🧩 ชุดรายการเพิ่มเติม — ทุกครั้งที่ตรวจพบสัญลักษณ์นี้ รายการด้านล่างจะถูกนับรวมเพิ่มโดยอัตโนมัติ (คูณตามจำนวนที่พบ)</div>
     <div id="bundleCurrentList" style="margin-top:10px;"></div>
     <div class="divider"></div>
     <label>ค้นหาเพื่อเพิ่มรายการ <input type="text" id="bundleSearch" placeholder="พิมพ์เพื่อค้นหาในตารางราคา..."></label>
@@ -377,6 +393,7 @@ let zones = []; // {id, x, y, w, h, sizeLabel} - size zones drawn on the current
 let priceList = []; // {id, code, name, unit, price}
 let lastCounts = null;
 let lastBundleRows = [];
+let lastResolvedRows = [];
 let stream = null;
 let continuousTimer = null;
 let cropMode = false, cropStart=null, cropRect=null;
@@ -421,8 +438,8 @@ async function refreshLibraryUI(){
         <button class="danger" style="padding:5px 8px;font-size:11px;" data-id="${sym.id}">ลบ</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);">
-        <span style="flex:1;font-size:11px;color:var(--muted);">🧩 ชุดรายการเพิ่มเติม: ${bundleCount} รายการ</span>
-        <button class="secondary" data-bundle-id="${sym.id}" style="padding:4px 8px;font-size:11px;">แก้ไข</button>
+        <span style="flex:1;font-size:11px;color:var(--muted);">${sym.sizeVariable?'🔧 ขนาดแปรผัน · ':''}🧩 ${bundleCount} รายการเพิ่มเติม</span>
+        <button class="secondary" data-bundle-id="${sym.id}" style="padding:4px 8px;font-size:11px;">⚙️ ตั้งค่า</button>
       </div>
     `;
     div.querySelector('button.danger').onclick = async ()=>{
@@ -528,12 +545,31 @@ let bundleEditingSymId = null;
 function openBundleEditor(symId){
   bundleEditingSymId = symId;
   const sym = symbols.find(s=>s.id===symId);
-  document.getElementById('bundleModalSubtitle').innerHTML = `สำหรับสัญลักษณ์ <b style="color:${sym.color}">${sym.code}</b> ${sym.name} — ทุกครั้งที่ตรวจพบสัญลักษณ์นี้ในภาพ รายการด้านล่างจะถูกนับรวมเพิ่มโดยอัตโนมัติ (คูณตามจำนวนที่พบ)`;
+  document.getElementById('bundleModalSubtitle').innerHTML = `สำหรับสัญลักษณ์ <b style="color:${sym.color}">${sym.code}</b> ${sym.name}`;
+  document.getElementById('bundleSizeVariable').checked = !!sym.sizeVariable;
+  document.getElementById('bundlePatternWrap').style.display = sym.sizeVariable ? 'block' : 'none';
+  document.getElementById('bundleNamePattern').value = sym.namePattern || sym.name || '';
   document.getElementById('bundleSearch').value = '';
   document.getElementById('bundleSearchResults').innerHTML = '';
   renderBundleCurrentList();
   document.getElementById('bundleModalOverlay').style.display = 'flex';
 }
+
+document.getElementById('bundleSizeVariable').onchange = async (e)=>{
+  document.getElementById('bundlePatternWrap').style.display = e.target.checked ? 'block' : 'none';
+  const sym = symbols.find(s=>s.id===bundleEditingSymId);
+  sym.sizeVariable = e.target.checked;
+  if(e.target.checked && !sym.namePattern){
+    sym.namePattern = sym.name || '';
+    document.getElementById('bundleNamePattern').value = sym.namePattern;
+  }
+  await updateSymbolInDB(sym);
+};
+document.getElementById('bundleNamePattern').oninput = async (e)=>{
+  const sym = symbols.find(s=>s.id===bundleEditingSymId);
+  sym.namePattern = e.target.value;
+  await updateSymbolInDB(sym);
+};
 
 function renderBundleCurrentList(){
   const sym = symbols.find(s=>s.id===bundleEditingSymId);
@@ -1080,6 +1116,7 @@ async function analyzeStage(){
   let frameGray = preprocessForMatching(frameMat);
 
   const counts = {};
+  const boxesBySymbol = {};
   symbols.forEach(s=>counts[s.id]=0);
 
   for(const sym of symbols){
@@ -1112,12 +1149,51 @@ async function analyzeStage(){
     }
     const finalBoxes = nms(allBoxes, 0.25);
     counts[sym.id] = finalBoxes.length;
+    boxesBySymbol[sym.id] = finalBoxes;
     finalBoxes.forEach(b=>drawBox(b, sym.color, sym.code));
   }
 
   frameMat.delete(); frameGray.delete();
+  const resolvedRows = computeResolvedRows(boxesBySymbol);
   const bundleRows = computeBundleRows(counts);
-  renderResults(counts, bundleRows);
+  renderResults(counts, bundleRows, resolvedRows);
+}
+
+/* ---- Zone-aware price resolution: pick the price-list row matching a symbol's
+   "name pattern" + the size label of whichever zone the detection falls inside ---- */
+function findZoneForPoint(x,y){
+  return zones.find(z => x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h) || null;
+}
+function resolvePriceRowForBox(sym, box){
+  const fallback = {code:sym.code, name:sym.name, unit:sym.unit, price:sym.price, color:sym.color};
+  if(!sym.sizeVariable) return fallback;
+  const cx = box.x + box.w/2, cy = box.y + box.h/2;
+  const zone = findZoneForPoint(cx, cy);
+  if(!zone) return {...fallback, sizeUnresolved:true};
+  const pattern = (sym.namePattern||'').toLowerCase().trim();
+  const sizeStr = (zone.sizeLabel||'').toLowerCase().trim();
+  const matches = priceList.filter(r=>{
+    const nm = (r.name||'').toLowerCase();
+    return (!pattern || nm.includes(pattern)) && (!sizeStr || nm.includes(sizeStr));
+  });
+  if(matches.length>0){
+    const m = matches[0];
+    return {code:m.code, name:m.name, unit:m.unit, price:m.price, color:sym.color};
+  }
+  return {...fallback, sizeUnresolved:true};
+}
+function computeResolvedRows(boxesBySymbol){
+  const map = {};
+  symbols.forEach(sym=>{
+    const boxes = boxesBySymbol[sym.id] || [];
+    boxes.forEach(box=>{
+      const r = resolvePriceRowForBox(sym, box);
+      const key = r.code + (r.sizeUnresolved ? '::unresolved' : '');
+      if(!map[key]) map[key] = {code:r.code, name:r.name, unit:r.unit, price:r.price, color:r.color, qty:0, sizeUnresolved:!!r.sizeUnresolved};
+      map[key].qty += 1;
+    });
+  });
+  return Object.values(map);
 }
 
 function computeBundleRows(counts){
@@ -1141,21 +1217,26 @@ function loadImage(src){
   });
 }
 
-function renderResults(counts, bundleRows){
+function renderResults(counts, bundleRows, resolvedRows){
   lastCounts = counts;
   lastBundleRows = bundleRows || [];
+  lastResolvedRows = resolvedRows || [];
   const body = document.getElementById('resultBody');
   body.innerHTML='';
   let total=0, grandValue=0, hasPricing=false;
+
   symbols.forEach(sym=>{
-    const c = counts[sym.id]||0;
-    total+=c;
     const badge = document.getElementById('badge-'+sym.id);
-    if(badge) badge.textContent = c;
-    const rowTotal = (sym.price!=null) ? c*sym.price : null;
+    if(badge) badge.textContent = counts[sym.id]||0;
+    total += counts[sym.id]||0;
+  });
+
+  lastResolvedRows.forEach(r=>{
+    const rowTotal = (r.price!=null) ? r.qty*r.price : null;
     if(rowTotal!=null){ grandValue += rowTotal; hasPricing = true; }
+    const warn = r.sizeUnresolved ? ' <span style="color:var(--warn);font-size:11px;">⚠️ ไม่พบโซนขนาด/รหัสตรงขนาด — ใช้รหัสเริ่มต้น</span>' : '';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td style="color:${sym.color};font-weight:700;">${sym.code}</td><td>${sym.name}</td><td>${sym.unit||'-'}</td><td style="text-align:right;">${c}</td><td style="text-align:right;">${fmtMoney(sym.price)}</td><td style="text-align:right;">${fmtMoney(rowTotal)}</td>`;
+    tr.innerHTML = `<td style="color:${r.color||'var(--accent)'};font-weight:700;">${r.code}</td><td>${r.name}${warn}</td><td>${r.unit||'-'}</td><td style="text-align:right;">${r.qty}</td><td style="text-align:right;">${fmtMoney(r.price)}</td><td style="text-align:right;">${fmtMoney(rowTotal)}</td>`;
     body.appendChild(tr);
   });
   lastBundleRows.forEach(b=>{
@@ -1165,7 +1246,7 @@ function renderResults(counts, bundleRows){
     tr.innerHTML = `<td style="color:var(--accent2);font-weight:700;">${b.code}</td><td>${b.name} <span style="color:var(--muted);font-size:11px;">(อุปกรณ์แนบ)</span></td><td>${b.unit||'-'}</td><td style="text-align:right;">${b.qty}</td><td style="text-align:right;">${fmtMoney(b.price)}</td><td style="text-align:right;">${fmtMoney(rowTotal)}</td>`;
     body.appendChild(tr);
   });
-  if(symbols.length===0 && lastBundleRows.length===0) body.innerHTML='<tr><td colspan="6" class="empty">ยังไม่มีผลวิเคราะห์</td></tr>';
+  if(lastResolvedRows.length===0 && lastBundleRows.length===0) body.innerHTML='<tr><td colspan="6" class="empty">ยังไม่มีผลวิเคราะห์</td></tr>';
   document.getElementById('totalCount').textContent = total;
   const valueBox = document.getElementById('totalValueBox');
   if(hasPricing){
@@ -1177,14 +1258,13 @@ function renderResults(counts, bundleRows){
 }
 
 document.getElementById('btnExportExcel').onclick = ()=>{
-  if(!lastCounts || symbols.length===0){ alert('กรุณากด "วิเคราะห์สัญลักษณ์ในภาพนี้" อย่างน้อยหนึ่งครั้งก่อนส่งออก'); return; }
+  if(!lastCounts || (lastResolvedRows.length===0 && lastBundleRows.length===0)){ alert('กรุณากด "วิเคราะห์สัญลักษณ์ในภาพนี้" อย่างน้อยหนึ่งครั้งก่อนส่งออก'); return; }
   const data = [['รหัส','รายการ','หน่วย','จำนวน','ราคา/หน่วย','รวม']];
   let grandTotal = 0;
-  symbols.forEach(sym=>{
-    const qty = lastCounts[sym.id]||0;
-    const rowTotal = (sym.price!=null) ? qty*sym.price : '';
-    if(sym.price!=null) grandTotal += qty*sym.price;
-    data.push([sym.code, sym.name, sym.unit||'', qty, sym.price??'', rowTotal]);
+  lastResolvedRows.forEach(r=>{
+    const rowTotal = (r.price!=null) ? r.qty*r.price : '';
+    if(r.price!=null) grandTotal += r.qty*r.price;
+    data.push([r.code, r.name + (r.sizeUnresolved?' (ตรวจสอบขนาด)':''), r.unit||'', r.qty, r.price??'', rowTotal]);
   });
   (lastBundleRows||[]).forEach(b=>{
     const rowTotal = (b.price!=null) ? b.qty*b.price : '';
