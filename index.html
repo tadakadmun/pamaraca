@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blueprint Symbol Scanner - ส่องแบบแปลนหาสัญลักษณ์</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1d2740; --border:#2a3654;
+    --text:#e8ecf5; --muted:#8a94ad; --accent:#4f8cff; --accent2:#7c5cff;
+    --good:#3ddc97; --warn:#ffb64f; --bad:#ff5c7a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:16px 20px;background:linear-gradient(90deg,#141b2e,#1a2440);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:18px;margin:0;font-weight:600;}
+  header .sub{font-size:12px;color:var(--muted);}
+  #cvStatus{font-size:12px;padding:4px 10px;border-radius:20px;background:#3a2c1a;color:var(--warn);}
+  #cvStatus.ready{background:#123527;color:var(--good);}
+  main{display:grid;grid-template-columns:300px 1fr 300px;gap:14px;padding:14px;max-width:1500px;margin:0 auto;}
+  @media (max-width:1100px){ main{grid-template-columns:1fr;} }
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;}
+  .panel h2{font-size:14px;margin:0 0 10px 0;color:var(--accent);}
+  button{cursor:pointer;border:none;border-radius:8px;padding:9px 12px;font-size:13px;background:var(--accent);color:#fff;font-weight:600;transition:.15s;}
+  button:hover{filter:brightness(1.1);}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  button.danger{background:var(--bad);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  input[type=text],input[type=number],select{width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;margin-top:4px;}
+  label{font-size:12px;color:var(--muted);display:block;margin-top:8px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .symbol-item{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--panel2);}
+  .symbol-item img{width:40px;height:40px;object-fit:contain;background:#fff;border-radius:4px;}
+  .symbol-info{flex:1;min-width:0;}
+  .symbol-info .code{font-weight:700;font-size:13px;color:var(--accent);}
+  .symbol-info .name{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .symbol-item .count-badge{background:var(--accent2);color:#fff;font-size:12px;font-weight:700;padding:3px 8px;border-radius:12px;min-width:22px;text-align:center;}
+  #stageWrap{position:relative;width:100%;background:#000;border-radius:10px;overflow:auto;border:1px solid var(--border);min-height:300px;display:flex;align-items:center;justify-content:center;}
+  #stageWrap canvas{max-width:100%;display:block;}
+  #overlay{position:absolute;top:0;left:0;pointer-events:none;}
+  video{display:none;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px;}
+  .status-line{font-size:12px;color:var(--muted);margin-top:8px;}
+  .toggle-row{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:20px 0;}
+  .divider{height:1px;background:var(--border);margin:12px 0;}
+  #resultTable{width:100%;border-collapse:collapse;font-size:13px;}
+  #resultTable th,#resultTable td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--border);}
+  #resultTable th{color:var(--muted);font-weight:600;}
+  .total-box{background:var(--panel2);border-radius:8px;padding:10px;text-align:center;margin-bottom:10px;}
+  .total-box .num{font-size:28px;font-weight:800;color:var(--good);}
+  .total-box .lbl{font-size:12px;color:var(--muted);}
+  #cropOverlay{position:absolute;top:0;left:0;pointer-events:auto;cursor:crosshair;}
+</style>
+</head>
+<body>
+
+<script>
+  // Must be defined before opencv.js loads
+  var cvReady = false;
+  var Module = {
+    onRuntimeInitialized() {
+      cvReady = true;
+      var s = document.getElementById('cvStatus');
+      s.textContent = 'พร้อมใช้งาน (โหลดเสร็จแล้ว)';
+      s.classList.add('ready');
+      document.querySelectorAll('.needs-cv').forEach(b=>b.disabled=false);
+    }
+  };
+</script>
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<header>
+  <div>
+    <h1>🔍 Blueprint Symbol Scanner</h1>
+    <div class="sub">ส่องแบบแปลน วิเคราะห์สัญลักษณ์ และนับจำนวนอัตโนมัติ — ประมวลผลในเบราว์เซอร์ทั้งหมด ไม่ส่งข้อมูลออกไปไหน</div>
+  </div>
+  <div id="cvStatus">กำลังโหลดเอนจินวิเคราะห์ภาพ...</div>
+</header>
+
+<main>
+  <!-- LEFT: Symbol Library -->
+  <div class="panel">
+    <h2>📚 ฐานข้อมูลสัญลักษณ์ (ของคุณ)</h2>
+    <div class="hint">เพิ่มสัญลักษณ์ได้ 2 ทาง: (1) ลากเลือกกรอบจากภาพแบบแปลนที่แสดงอยู่ตรงกลาง หรือ (2) อัปโหลดไฟล์รูปสัญลักษณ์โดยตรง</div>
+    <button class="secondary needs-cv" id="btnUploadSymbol" disabled style="margin-top:10px;width:100%;">➕ อัปโหลดรูปสัญลักษณ์</button>
+    <input type="file" id="fileSymbolUpload" accept="image/*" style="display:none;">
+    <div class="divider"></div>
+    <div id="libraryList"><div class="empty">ยังไม่มีสัญลักษณ์ในฐานข้อมูล</div></div>
+  </div>
+
+  <!-- CENTER: Stage -->
+  <div class="panel">
+    <h2>🖥️ แหล่งภาพแบบแปลน</h2>
+    <div class="row">
+      <button class="needs-cv" id="btnShareScreen" disabled>🖥️ แชร์หน้าจอ (ส่องสด)</button>
+      <button class="secondary" id="btnUploadPlan">🖼️ อัปโหลดภาพแบบแปลน</button>
+      <input type="file" id="fileplanUpload" accept="image/*" style="display:none;">
+      <button class="secondary" id="btnCaptureFrame" disabled>📸 จับภาพเฟรมปัจจุบัน</button>
+    </div>
+    <div class="status-line" id="stageStatus">ยังไม่มีภาพ — เริ่มด้วยการแชร์หน้าจอ หรืออัปโหลดภาพแบบแปลน</div>
+
+    <div id="stageWrap" style="margin-top:10px;">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="stage"></canvas>
+      <canvas id="overlay"></canvas>
+      <canvas id="cropOverlay"></canvas>
+      <div class="empty" id="stageEmpty">ยังไม่มีภาพแสดงผล</div>
+    </div>
+
+    <div class="hint" id="cropHint" style="display:none;">
+      ✏️ โหมดเลือกกรอบสัญลักษณ์: ลากเมาส์บนภาพเพื่อเลือกกรอบสัญลักษณ์ที่ต้องการเพิ่มเข้าฐานข้อมูล แล้วกด "บันทึกเป็นสัญลักษณ์ใหม่"
+      <div class="row" style="margin-top:6px;">
+        <button id="btnSaveCrop" class="secondary" disabled>💾 บันทึกเป็นสัญลักษณ์ใหม่</button>
+        <button id="btnCancelCrop" class="secondary">✖ ยกเลิกโหมดเลือกกรอบ</button>
+      </div>
+    </div>
+    <button class="secondary" id="btnStartCrop" style="margin-top:8px;display:none;">✂️ เข้าสู่โหมดเลือกกรอบสัญลักษณ์จากภาพนี้</button>
+
+    <div class="divider"></div>
+    <div class="row" style="align-items:center;">
+      <label style="margin:0;flex:1;min-width:150px;">ระดับความเหมือน (Threshold)
+        <input type="number" id="threshold" min="0.4" max="0.99" step="0.01" value="0.75">
+      </label>
+      <label style="margin:0;flex:1;min-width:150px;">ทุกกี่วินาที (โหมดต่อเนื่อง)
+        <input type="number" id="intervalSec" min="1" max="30" step="1" value="3">
+      </label>
+    </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="continuousToggle" disabled>
+      <label style="margin:0;" for="continuousToggle">🔄 วิเคราะห์ต่อเนื่องอัตโนมัติ (ขณะแชร์หน้าจอ)</label>
+    </div>
+    <button class="needs-cv" id="btnAnalyze" disabled style="margin-top:10px;width:100%;">🔎 วิเคราะห์สัญลักษณ์ในภาพนี้</button>
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="panel">
+    <h2>📊 สรุปผล</h2>
+    <div class="total-box">
+      <div class="num" id="totalCount">0</div>
+      <div class="lbl">จำนวนสัญลักษณ์ทั้งหมดที่พบในภาพนี้</div>
+    </div>
+    <table id="resultTable">
+      <thead><tr><th>รหัส</th><th>ชื่อ</th><th style="text-align:right;">จำนวน</th></tr></thead>
+      <tbody id="resultBody"><tr><td colspan="3" class="empty">ยังไม่มีผลวิเคราะห์</td></tr></tbody>
+    </table>
+    <div class="divider"></div>
+    <div class="hint">🔒 ความเป็นส่วนตัว: รูปภาพและฐานข้อมูลสัญลักษณ์ทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเท่านั้น (IndexedDB) ไม่มีการอัปโหลดขึ้นเซิร์ฟเวอร์หรือที่ใดๆ ทั้งสิ้น หากล้างข้อมูลเบราว์เซอร์ ฐานข้อมูลจะหายไปด้วย</div>
+  </div>
+</main>
+
+<script>
+/* ============ IndexedDB storage (private, local-only) ============ */
+const DB_NAME = 'blueprintSymbolDB', STORE = 'symbols';
+let db;
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains(STORE)){
+        d.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});
+      }
+    };
+    req.onsuccess = e=>{ db=e.target.result; resolve(db); };
+    req.onerror = e=>reject(e);
+  });
+}
+function addSymbolToDB(sym){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).add(sym);
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = e=>reject(e);
+  });
+}
+function getAllSymbolsFromDB(){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = e=>reject(e);
+  });
+}
+function deleteSymbolFromDB(id){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = ()=>resolve();
+    req.onerror = e=>reject(e);
+  });
+}
+
+/* ============ App state ============ */
+let symbols = []; // {id, code, name, dataURL, w, h, color}
+let stream = null;
+let continuousTimer = null;
+let cropMode = false, cropStart=null, cropRect=null;
+
+const video = document.getElementById('video');
+const stage = document.getElementById('stage');
+const overlay = document.getElementById('overlay');
+const cropOverlay = document.getElementById('cropOverlay');
+const stageEmpty = document.getElementById('stageEmpty');
+const stageStatus = document.getElementById('stageStatus');
+const libraryList = document.getElementById('libraryList');
+
+const COLORS = ['#ff5c7a','#4f8cff','#3ddc97','#ffb64f','#7c5cff','#ff8ac8','#5ce1e6','#c4ff5c'];
+
+function randomColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+
+/* ============ Library UI ============ */
+async function refreshLibraryUI(){
+  symbols = await getAllSymbolsFromDB();
+  if(symbols.length===0){
+    libraryList.innerHTML = '<div class="empty">ยังไม่มีสัญลักษณ์ในฐานข้อมูล</div>';
+    return;
+  }
+  libraryList.innerHTML = '';
+  symbols.forEach(sym=>{
+    const div = document.createElement('div');
+    div.className = 'symbol-item';
+    div.innerHTML = `
+      <img src="${sym.dataURL}">
+      <div class="symbol-info">
+        <div class="code" style="color:${sym.color}">${sym.code}</div>
+        <div class="name">${sym.name}</div>
+      </div>
+      <span class="count-badge" id="badge-${sym.id}">0</span>
+      <button class="danger" style="padding:5px 8px;font-size:11px;" data-id="${sym.id}">ลบ</button>
+    `;
+    div.querySelector('button.danger').onclick = async ()=>{
+      if(confirm('ลบสัญลักษณ์นี้ออกจากฐานข้อมูล?')){
+        await deleteSymbolFromDB(sym.id);
+        refreshLibraryUI();
+      }
+    };
+    libraryList.appendChild(div);
+  });
+}
+
+function addSymbolFromDataURL(dataURL, w, h){
+  const code = prompt('ระบุรหัส/เลขของสัญลักษณ์นี้ (เช่น E-01, SW-02):');
+  if(!code) return;
+  const name = prompt('ระบุชื่ออุปกรณ์ของสัญลักษณ์นี้ (เช่น เต้ารับไฟฟ้า, สวิตช์ไฟ):') || '';
+  const sym = { code, name, dataURL, w, h, color: randomColor() };
+  addSymbolToDB(sym).then(refreshLibraryUI);
+}
+
+document.getElementById('btnUploadSymbol').onclick = ()=>{
+  document.getElementById('fileSymbolUpload').click();
+};
+document.getElementById('fileSymbolUpload').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const img = new Image();
+    img.onload = ()=> addSymbolFromDataURL(ev.target.result, img.width, img.height);
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+};
+
+/* ============ Stage: screen share / upload plan ============ */
+function showStageCanvas(){
+  stageEmpty.style.display = 'none';
+  document.getElementById('btnAnalyze').disabled = !cvReady;
+  document.getElementById('btnStartCrop').style.display = 'inline-block';
+}
+
+function fitCanvasesToStage(w,h){
+  [stage, overlay, cropOverlay].forEach(c=>{ c.width=w; c.height=h; });
+  overlay.style.width = stage.style.width = cropOverlay.style.width = w+'px';
+}
+
+async function startScreenShare(){
+  try{
+    stream = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'never'}, audio:false});
+    video.srcObject = stream;
+    await video.play();
+    fitCanvasesToStage(video.videoWidth, video.videoHeight);
+    drawVideoFrameToStage();
+    showStageCanvas();
+    stageStatus.textContent = 'กำลังแชร์หน้าจอสด — กด "จับภาพเฟรมปัจจุบัน" หรือเปิดโหมดวิเคราะห์ต่อเนื่อง';
+    document.getElementById('btnCaptureFrame').disabled = false;
+    document.getElementById('continuousToggle').disabled = false;
+    stream.getVideoTracks()[0].addEventListener('ended', stopScreenShare);
+  }catch(err){
+    alert('ไม่สามารถแชร์หน้าจอได้: '+err.message);
+  }
+}
+function stopScreenShare(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  document.getElementById('btnCaptureFrame').disabled = true;
+  document.getElementById('continuousToggle').checked = false;
+  document.getElementById('continuousToggle').disabled = true;
+  stopContinuous();
+  stageStatus.textContent = 'หยุดการแชร์หน้าจอแล้ว';
+}
+function drawVideoFrameToStage(){
+  const ctx = stage.getContext('2d');
+  ctx.drawImage(video,0,0,stage.width,stage.height);
+}
+
+document.getElementById('btnShareScreen').onclick = startScreenShare;
+document.getElementById('btnCaptureFrame').onclick = ()=>{
+  drawVideoFrameToStage();
+  clearOverlay();
+  stageStatus.textContent = 'จับภาพเฟรมแล้ว — พร้อมวิเคราะห์';
+};
+
+document.getElementById('btnUploadPlan').onclick = ()=> document.getElementById('fileplanUpload').click();
+document.getElementById('fileplanUpload').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const img = new Image();
+    img.onload = ()=>{
+      fitCanvasesToStage(img.width, img.height);
+      stage.getContext('2d').drawImage(img,0,0);
+      clearOverlay();
+      showStageCanvas();
+      stageStatus.textContent = 'โหลดภาพแบบแปลนแล้ว — พร้อมวิเคราะห์';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+};
+
+/* ============ Crop mode: select region to save as new symbol ============ */
+document.getElementById('btnStartCrop').onclick = ()=>{
+  cropMode = true;
+  document.getElementById('cropHint').style.display='block';
+  cropOverlay.style.pointerEvents='auto';
+};
+document.getElementById('btnCancelCrop').onclick = ()=>{
+  cropMode = false; cropRect=null;
+  document.getElementById('cropHint').style.display='none';
+  document.getElementById('btnSaveCrop').disabled = true;
+  cropOverlay.getContext('2d').clearRect(0,0,cropOverlay.width,cropOverlay.height);
+};
+cropOverlay.addEventListener('mousedown', e=>{
+  if(!cropMode) return;
+  const rect = cropOverlay.getBoundingClientRect();
+  const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
+  cropStart = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+});
+cropOverlay.addEventListener('mousemove', e=>{
+  if(!cropMode || !cropStart) return;
+  const rect = cropOverlay.getBoundingClientRect();
+  const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
+  const cur = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+  cropRect = { x:Math.min(cropStart.x,cur.x), y:Math.min(cropStart.y,cur.y), w:Math.abs(cur.x-cropStart.x), h:Math.abs(cur.y-cropStart.y) };
+  const ctx = cropOverlay.getContext('2d');
+  ctx.clearRect(0,0,cropOverlay.width,cropOverlay.height);
+  ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 2;
+  ctx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+});
+cropOverlay.addEventListener('mouseup', ()=>{
+  cropStart = null;
+  document.getElementById('btnSaveCrop').disabled = !(cropRect && cropRect.w>3 && cropRect.h>3);
+});
+document.getElementById('btnSaveCrop').onclick = ()=>{
+  if(!cropRect) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.round(cropRect.w); tmp.height = Math.round(cropRect.h);
+  tmp.getContext('2d').drawImage(stage, cropRect.x, cropRect.y, cropRect.w, cropRect.h, 0,0, tmp.width, tmp.height);
+  addSymbolFromDataURL(tmp.toDataURL('image/png'), tmp.width, tmp.height);
+  document.getElementById('btnCancelCrop').click();
+};
+
+/* ============ Overlay drawing ============ */
+function clearOverlay(){
+  overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height);
+}
+function drawBox(box, color, label){
+  const ctx = overlay.getContext('2d');
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.strokeRect(box.x, box.y, box.w, box.h);
+  ctx.fillStyle = color;
+  const textW = ctx.measureText(label).width + 8;
+  ctx.fillRect(box.x, Math.max(0,box.y-16), textW, 16);
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillText(label, box.x+4, Math.max(11,box.y-4));
+}
+
+/* ============ Template matching with OpenCV.js ============ */
+function iou(a,b){
+  const x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+  const x2=Math.min(a.x+a.w,b.x+b.w), y2=Math.min(a.y+a.h,b.y+b.h);
+  const inter = Math.max(0,x2-x1)*Math.max(0,y2-y1);
+  const union = a.w*a.h + b.w*b.h - inter;
+  return union<=0?0:inter/union;
+}
+function nms(boxes, threshold=0.3){
+  boxes.sort((a,b)=>b.score-a.score);
+  const kept=[];
+  for(const b of boxes){
+    if(!kept.some(k=>iou(k,b)>threshold)) kept.push(b);
+  }
+  return kept;
+}
+
+async function analyzeStage(){
+  if(!cvReady){ alert('เอนจินวิเคราะห์ภาพยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
+  if(symbols.length===0){ alert('กรุณาเพิ่มสัญลักษณ์ในฐานข้อมูลก่อน'); return; }
+  clearOverlay();
+  const threshold = parseFloat(document.getElementById('threshold').value)||0.75;
+  const scales = [0.8,0.9,1.0,1.1,1.2];
+
+  let frameMat = cv.imread(stage);
+  let frameGray = new cv.Mat();
+  cv.cvtColor(frameMat, frameGray, cv.COLOR_RGBA2GRAY);
+
+  const counts = {};
+  symbols.forEach(s=>counts[s.id]=0);
+
+  for(const sym of symbols){
+    const templImg = await loadImage(sym.dataURL);
+    let allBoxes = [];
+    for(const scale of scales){
+      const tw = Math.round(templImg.width*scale), th = Math.round(templImg.height*scale);
+      if(tw<4||th<4||tw>frameGray.cols||th>frameGray.rows) continue;
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width=tw; tmpCanvas.height=th;
+      tmpCanvas.getContext('2d').drawImage(templImg,0,0,tw,th);
+      let templMat = cv.imread(tmpCanvas);
+      let templGray = new cv.Mat();
+      cv.cvtColor(templMat, templGray, cv.COLOR_RGBA2GRAY);
+
+      let result = new cv.Mat();
+      cv.matchTemplate(frameGray, templGray, result, cv.TM_CCOEFF_NORMED);
+
+      let iterations=0;
+      while(iterations<40){
+        const mm = cv.minMaxLoc(result);
+        if(mm.maxVal < threshold) break;
+        allBoxes.push({x:mm.maxLoc.x, y:mm.maxLoc.y, w:tw, h:th, score:mm.maxVal});
+        // suppress this area so it isn't found again
+        const pt1 = new cv.Point(Math.max(0,mm.maxLoc.x-Math.floor(tw/2)), Math.max(0,mm.maxLoc.y-Math.floor(th/2)));
+        const pt2 = new cv.Point(Math.min(result.cols-1,mm.maxLoc.x+Math.floor(tw/2)), Math.min(result.rows-1,mm.maxLoc.y+Math.floor(th/2)));
+        cv.rectangle(result, pt1, pt2, new cv.Scalar(-1), -1);
+        iterations++;
+      }
+      result.delete(); templMat.delete(); templGray.delete();
+    }
+    const finalBoxes = nms(allBoxes, 0.25);
+    counts[sym.id] = finalBoxes.length;
+    finalBoxes.forEach(b=>drawBox(b, sym.color, sym.code));
+  }
+
+  frameMat.delete(); frameGray.delete();
+  renderResults(counts);
+}
+
+function loadImage(src){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.onload = ()=>resolve(img);
+    img.src = src;
+  });
+}
+
+function renderResults(counts){
+  const body = document.getElementById('resultBody');
+  body.innerHTML='';
+  let total=0;
+  symbols.forEach(sym=>{
+    const c = counts[sym.id]||0;
+    total+=c;
+    const badge = document.getElementById('badge-'+sym.id);
+    if(badge) badge.textContent = c;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:${sym.color};font-weight:700;">${sym.code}</td><td>${sym.name}</td><td style="text-align:right;">${c}</td>`;
+    body.appendChild(tr);
+  });
+  if(symbols.length===0) body.innerHTML='<tr><td colspan="3" class="empty">ยังไม่มีผลวิเคราะห์</td></tr>';
+  document.getElementById('totalCount').textContent = total;
+}
+
+document.getElementById('btnAnalyze').onclick = analyzeStage;
+
+/* ============ Continuous mode ============ */
+document.getElementById('continuousToggle').onchange = (e)=>{
+  if(e.target.checked) startContinuous(); else stopContinuous();
+};
+function startContinuous(){
+  stopContinuous();
+  const sec = parseInt(document.getElementById('intervalSec').value)||3;
+  continuousTimer = setInterval(async ()=>{
+    if(!stream) return;
+    drawVideoFrameToStage();
+    await analyzeStage();
+  }, sec*1000);
+}
+function stopContinuous(){
+  if(continuousTimer){ clearInterval(continuousTimer); continuousTimer=null; }
+}
+
+/* ============ Init ============ */
+openDB().then(refreshLibraryUI);
+</script>
+</body>
+</html>
