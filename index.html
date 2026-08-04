@@ -145,6 +145,10 @@
       </label>
     </div>
     <div class="toggle-row">
+      <input type="checkbox" id="shapeOnlyToggle" checked>
+      <label style="margin:0;" for="shapeOnlyToggle">🎯 จับคู่แบบไม่สนใจสี (เน้นรูปทรง/ลวดลายเส้นเท่านั้น)</label>
+    </div>
+    <div class="toggle-row">
       <input type="checkbox" id="continuousToggle" disabled>
       <label style="margin:0;" for="continuousToggle">🔄 วิเคราะห์ต่อเนื่องอัตโนมัติ (ขณะแชร์หน้าจอ)</label>
     </div>
@@ -231,24 +235,26 @@
 
 <!-- Screen-capture-to-symbol modal -->
 <div class="modal-overlay" id="captureModalOverlay">
-  <div class="modal-box" style="width:760px;">
+  <div class="modal-box" style="width:920px;max-width:96vw;">
     <h3>📸 แคปหน้าจอเพื่อเพิ่มสัญลักษณ์</h3>
-    <div class="hint">กดแคปแล้วเลือกหน้าต่าง/หน้าจอที่มีสัญลักษณ์อยู่ จากนั้น <b>ซูมเข้า</b> ไปยังส่วนที่ต้องการ แล้วลากเลือกกรอบสัญลักษณ์ให้แม่นยำ ก่อนกด "บันทึก"</div>
+    <div class="hint">1) กดแคปแล้วเลือกหน้าต่าง/หน้าจอที่มีสัญลักษณ์อยู่ &nbsp; 2) ซูมเข้าหาจุดที่ต้องการ &nbsp; 3) <b>กดค้างแล้วลากเมาส์บนภาพด้านล่างเพื่อวาดกรอบล้อมสัญลักษณ์เอง</b> (เหมือนเครื่องมือ Snipping Tool) &nbsp; 4) กด "บันทึก"</div>
     <div class="row" style="margin-top:8px;align-items:center;">
       <button class="secondary" id="btnZoomOut">➖ ซูมออก</button>
       <span id="zoomLabel" style="align-self:center;font-size:12px;color:var(--muted);min-width:44px;text-align:center;">100%</span>
       <button class="secondary" id="btnZoomIn">➕ ซูมเข้า</button>
       <button class="secondary" id="btnZoomReset">↺ รีเซ็ตซูม</button>
-      <span class="status-line" style="margin:0;">💡 ซูมแล้วลากสกอร์ลบาร์เพื่อหาสัญลักษณ์ที่ต้องการ</span>
     </div>
-    <div id="captureStageWrap" style="position:relative;width:100%;max-height:420px;background:#000;border-radius:8px;overflow:auto;margin-top:8px;min-height:220px;display:flex;align-items:flex-start;justify-content:flex-start;">
+    <div style="background:rgba(79,140,255,.15);border:1px solid var(--accent);color:var(--accent);font-size:12px;font-weight:700;padding:8px 10px;border-radius:8px;margin-top:8px;text-align:center;">
+      🖱️ กดค้างแล้วลากเมาส์บนภาพด้านล่าง เพื่อวาดกรอบเลือกสัญลักษณ์ด้วยตัวเอง
+    </div>
+    <div id="captureStageWrap" style="position:relative;width:100%;max-height:520px;background:#000;border-radius:8px;overflow:auto;margin-top:8px;min-height:260px;display:flex;align-items:flex-start;justify-content:flex-start;">
       <canvas id="captureCanvas"></canvas>
       <canvas id="captureCropOverlay"></canvas>
       <div class="empty" id="captureEmpty" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;">กำลังขอสิทธิ์แชร์หน้าจอ...</div>
     </div>
     <div class="row" style="margin-top:12px;">
       <button class="secondary" id="btnRecapture">🔄 แคปใหม่</button>
-      <button id="btnSaveCaptureSymbol" disabled style="flex:1;">💾 บันทึกเป็นสัญลักษณ์ใหม่</button>
+      <button id="btnSaveCaptureSymbol" disabled style="flex:1;">💾 บันทึกเป็นสัญลักษณ์ใหม่จากกรอบที่ลากไว้</button>
       <button class="secondary" id="btnCloseCaptureModal">✖ ปิด</button>
     </div>
   </div>
@@ -668,18 +674,32 @@ async function identifyAt(px,py){
   return {bestSym, bestScore};
 }
 
+/* Convert a Mat to a single-channel Mat for matching. When "shape-only" mode is on,
+   this reduces the image to its edge/outline pattern via Canny so color and
+   brightness differences (which change between captures) don't affect matching. */
+function preprocessForMatching(mat){
+  const shapeOnly = document.getElementById('shapeOnlyToggle').checked;
+  let gray = new cv.Mat();
+  cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+  if(!shapeOnly) return gray;
+  let blurred = new cv.Mat();
+  cv.GaussianBlur(gray, blurred, new cv.Size(3,3), 0);
+  let edges = new cv.Mat();
+  cv.Canny(blurred, edges, 40, 120);
+  gray.delete(); blurred.delete();
+  return edges;
+}
+
 function computeSimilarity(cropCanvas, symImg){
   let cropMat, cropGray, templMat, templGray, result;
   try{
     cropMat = cv.imread(cropCanvas);
-    cropGray = new cv.Mat();
-    cv.cvtColor(cropMat, cropGray, cv.COLOR_RGBA2GRAY);
+    cropGray = preprocessForMatching(cropMat);
     const tmp = document.createElement('canvas');
     tmp.width = cropCanvas.width; tmp.height = cropCanvas.height;
     tmp.getContext('2d').drawImage(symImg,0,0,tmp.width,tmp.height);
     templMat = cv.imread(tmp);
-    templGray = new cv.Mat();
-    cv.cvtColor(templMat, templGray, cv.COLOR_RGBA2GRAY);
+    templGray = preprocessForMatching(templMat);
     result = new cv.Mat();
     cv.matchTemplate(cropGray, templGray, result, cv.TM_CCOEFF_NORMED);
     return result.data32F[0];
@@ -741,8 +761,7 @@ async function analyzeStage(){
   const scales = [0.8,0.9,1.0,1.1,1.2];
 
   let frameMat = cv.imread(stage);
-  let frameGray = new cv.Mat();
-  cv.cvtColor(frameMat, frameGray, cv.COLOR_RGBA2GRAY);
+  let frameGray = preprocessForMatching(frameMat);
 
   const counts = {};
   symbols.forEach(s=>counts[s.id]=0);
@@ -757,8 +776,7 @@ async function analyzeStage(){
       tmpCanvas.width=tw; tmpCanvas.height=th;
       tmpCanvas.getContext('2d').drawImage(templImg,0,0,tw,th);
       let templMat = cv.imread(tmpCanvas);
-      let templGray = new cv.Mat();
-      cv.cvtColor(templMat, templGray, cv.COLOR_RGBA2GRAY);
+      let templGray = preprocessForMatching(templMat);
 
       let result = new cv.Mat();
       cv.matchTemplate(frameGray, templGray, result, cv.TM_CCOEFF_NORMED);
