@@ -290,10 +290,13 @@
         <span>🔧 ขนาดของอุปกรณ์นี้แปรผันตามโซนขนาดในภาพ (ค้นรหัสให้ตรงขนาดอัตโนมัติ)</span>
       </label>
       <div id="bundlePatternWrap" style="display:none;margin-top:8px;">
-        <label>คำค้นหลัก (ชื่อแบบไม่ระบุขนาด เช่น "ท่อ HDPE100 ชั้น PN6")
+        <label>รหัสหลัก (เช่น "20" — ระบบจะค้นรหัสที่ขึ้นต้นด้วย 20. แล้วจับคู่ขนาด แม่นยำกว่าใช้ชื่อ)
+          <input type="text" id="bundleBaseCode" placeholder="เช่น 20">
+        </label>
+        <label style="margin-top:8px;">คำค้นหลัก (สำรอง — ใช้เมื่อไม่ได้ใส่รหัสหลัก เช่น "ท่อ HDPE100 ชั้น PN6")
           <input type="text" id="bundleNamePattern">
         </label>
-        <div class="hint">ตอนวิเคราะห์ ถ้าสัญลักษณ์นี้ตกอยู่ในโซนขนาดไหน ระบบจะค้นตารางราคาด้วย "คำค้นหลัก + ขนาดของโซน" แล้วใช้รหัสที่เจอแทนรหัสเดิมอัตโนมัติ ถ้าไม่พบโซนหรือไม่พบรหัสตรง จะใช้รหัสเริ่มต้นของสัญลักษณ์แทน</div>
+        <div class="hint">ตอนวิเคราะห์ ถ้าสัญลักษณ์นี้ตกอยู่ในโซนขนาดไหน ระบบจะค้นตารางราคาด้วยรหัสหลัก (ถ้ามี) หรือคำค้นหลัก + ขนาดของโซน แล้วใช้รหัสที่เจอแทนรหัสเดิมอัตโนมัติ ถ้าไม่พบโซนหรือไม่พบรหัสตรง จะใช้รหัสเริ่มต้นของสัญลักษณ์แทน</div>
       </div>
     </div>
 
@@ -548,6 +551,7 @@ function openBundleEditor(symId){
   document.getElementById('bundleModalSubtitle').innerHTML = `สำหรับสัญลักษณ์ <b style="color:${sym.color}">${sym.code}</b> ${sym.name}`;
   document.getElementById('bundleSizeVariable').checked = !!sym.sizeVariable;
   document.getElementById('bundlePatternWrap').style.display = sym.sizeVariable ? 'block' : 'none';
+  document.getElementById('bundleBaseCode').value = sym.baseCode || '';
   document.getElementById('bundleNamePattern').value = sym.namePattern || sym.name || '';
   document.getElementById('bundleSearch').value = '';
   document.getElementById('bundleSearchResults').innerHTML = '';
@@ -563,6 +567,11 @@ document.getElementById('bundleSizeVariable').onchange = async (e)=>{
     sym.namePattern = sym.name || '';
     document.getElementById('bundleNamePattern').value = sym.namePattern;
   }
+  await updateSymbolInDB(sym);
+};
+document.getElementById('bundleBaseCode').oninput = async (e)=>{
+  const sym = symbols.find(s=>s.id===bundleEditingSymId);
+  sym.baseCode = e.target.value;
   await updateSymbolInDB(sym);
 };
 document.getElementById('bundleNamePattern').oninput = async (e)=>{
@@ -1160,9 +1169,15 @@ async function analyzeStage(){
 }
 
 /* ---- Zone-aware price resolution: pick the price-list row matching a symbol's
-   "name pattern" + the size label of whichever zone the detection falls inside ---- */
+   base code prefix (or name pattern) + the size label of whichever zone the detection falls inside ---- */
 function findZoneForPoint(x,y){
   return zones.find(z => x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h) || null;
+}
+function sizeMatches(text, sizeStr){
+  if(!sizeStr) return true;
+  const esc = sizeStr.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re = new RegExp('(^|[^0-9])'+esc+'([^0-9]|$)');
+  return re.test(text);
 }
 function resolvePriceRowForBox(sym, box){
   const fallback = {code:sym.code, name:sym.name, unit:sym.unit, price:sym.price, color:sym.color};
@@ -1170,12 +1185,24 @@ function resolvePriceRowForBox(sym, box){
   const cx = box.x + box.w/2, cy = box.y + box.h/2;
   const zone = findZoneForPoint(cx, cy);
   if(!zone) return {...fallback, sizeUnresolved:true};
-  const pattern = (sym.namePattern||'').toLowerCase().trim();
   const sizeStr = (zone.sizeLabel||'').toLowerCase().trim();
-  const matches = priceList.filter(r=>{
-    const nm = (r.name||'').toLowerCase();
-    return (!pattern || nm.includes(pattern)) && (!sizeStr || nm.includes(sizeStr));
-  });
+  let matches = [];
+  const baseCode = (sym.baseCode||'').trim();
+  if(baseCode){
+    matches = priceList.filter(r=>{
+      const code = (r.code||'').trim();
+      const nm = (r.name||'').toLowerCase();
+      const codeMatches = code===baseCode || code.startsWith(baseCode+'.') || code.startsWith(baseCode+'-');
+      return codeMatches && sizeMatches(nm, sizeStr);
+    });
+  }
+  if(matches.length===0 && sym.namePattern){
+    const pattern = sym.namePattern.toLowerCase().trim();
+    matches = priceList.filter(r=>{
+      const nm = (r.name||'').toLowerCase();
+      return (!pattern || nm.includes(pattern)) && sizeMatches(nm, sizeStr);
+    });
+  }
   if(matches.length>0){
     const m = matches[0];
     return {code:m.code, name:m.name, unit:m.unit, price:m.price, color:sym.color};
