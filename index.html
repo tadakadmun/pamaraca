@@ -134,6 +134,9 @@
     <button class="secondary" id="btnStartCrop" style="margin-top:8px;display:none;">✂️ เข้าสู่โหมดเลือกกรอบสัญลักษณ์จากภาพนี้</button>
     <button class="secondary needs-cv" id="btnToggleIdentify" disabled style="margin-top:8px;display:none;">🎯 เปิดโหมดชี้ระบุสัญลักษณ์แบบเรียลไทม์</button>
     <div class="hint" id="identifyHint" style="display:none;">👆 เอาเมาส์ไปวางเหนือสัญลักษณ์บนภาพ ระบบจะบอกทันทีว่านี่คือสัญลักษณ์อะไร (เทียบกับฐานข้อมูลของคุณ)</div>
+    <button class="secondary" id="btnToggleZone" style="margin-top:8px;display:none;">📏 กำหนดโซนขนาดท่อ</button>
+    <div class="hint" id="zoneHint" style="display:none;">📏 ลากกรอบครอบช่วงท่อที่มีขนาดเดียวกัน แล้วพิมพ์ขนาด (เช่น 160) — ทำซ้ำได้หลายโซนตามช่วงขนาดที่เปลี่ยนในแบบ</div>
+    <div id="zoneListWrap"></div>
 
     <div class="divider"></div>
     <div class="row" style="align-items:center;">
@@ -260,6 +263,21 @@
   </div>
 </div>
 
+<!-- Item bundle editor modal -->
+<div class="modal-overlay" id="bundleModalOverlay">
+  <div class="modal-box" style="width:460px;">
+    <h3>🧩 ชุดรายการเพิ่มเติม</h3>
+    <div class="hint" id="bundleModalSubtitle"></div>
+    <div id="bundleCurrentList" style="margin-top:10px;"></div>
+    <div class="divider"></div>
+    <label>ค้นหาเพื่อเพิ่มรายการ <input type="text" id="bundleSearch" placeholder="พิมพ์เพื่อค้นหาในตารางราคา..."></label>
+    <div id="bundleSearchResults" style="max-height:200px;overflow:auto;margin-top:6px;"></div>
+    <div class="row" style="margin-top:16px;">
+      <button id="bundleDone" style="flex:1;">✅ เสร็จสิ้น</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ============ IndexedDB storage (private, local-only) ============ */
 const DB_NAME = 'blueprintSymbolDB', STORE = 'symbols', PRICE_STORE = 'priceList';
@@ -304,6 +322,14 @@ function deleteSymbolFromDB(id){
     req.onerror = e=>reject(e);
   });
 }
+function updateSymbolInDB(sym){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).put(sym);
+    req.onsuccess = ()=>resolve();
+    req.onerror = e=>reject(e);
+  });
+}
 function addPriceRowsBulk(rows){
   return new Promise((resolve,reject)=>{
     const tx = db.transaction(PRICE_STORE,'readwrite');
@@ -331,9 +357,11 @@ function clearPriceListDB(){
 }
 
 /* ============ App state ============ */
-let symbols = []; // {id, code, name, unit, price, dataURL, w, h, color}
+let symbols = []; // {id, code, name, unit, price, dataURL, w, h, color, bundle}
+let zones = []; // {id, x, y, w, h, sizeLabel} - size zones drawn on the current plan image (session-only)
 let priceList = []; // {id, code, name, unit, price}
 let lastCounts = null;
+let lastBundleRows = [];
 let stream = null;
 let continuousTimer = null;
 let cropMode = false, cropStart=null, cropRect=null;
@@ -362,16 +390,25 @@ async function refreshLibraryUI(){
   symbols.forEach(sym=>{
     const div = document.createElement('div');
     div.className = 'symbol-item';
+    div.style.flexDirection = 'column';
+    div.style.alignItems = 'stretch';
     const priceLine = (sym.unit || sym.price!=null) ? `<div class="name">${sym.unit||''}${sym.price!=null?' · ฿'+fmtMoney(sym.price):''}</div>` : '';
+    const bundleCount = (sym.bundle||[]).length;
     div.innerHTML = `
-      <img src="${sym.dataURL}">
-      <div class="symbol-info">
-        <div class="code" style="color:${sym.color}">${sym.code}</div>
-        <div class="name">${sym.name}</div>
-        ${priceLine}
+      <div style="display:flex;gap:8px;align-items:center;">
+        <img src="${sym.dataURL}">
+        <div class="symbol-info">
+          <div class="code" style="color:${sym.color}">${sym.code}</div>
+          <div class="name">${sym.name}</div>
+          ${priceLine}
+        </div>
+        <span class="count-badge" id="badge-${sym.id}">0</span>
+        <button class="danger" style="padding:5px 8px;font-size:11px;" data-id="${sym.id}">ลบ</button>
       </div>
-      <span class="count-badge" id="badge-${sym.id}">0</span>
-      <button class="danger" style="padding:5px 8px;font-size:11px;" data-id="${sym.id}">ลบ</button>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);">
+        <span style="flex:1;font-size:11px;color:var(--muted);">🧩 ชุดรายการเพิ่มเติม: ${bundleCount} รายการ</span>
+        <button class="secondary" data-bundle-id="${sym.id}" style="padding:4px 8px;font-size:11px;">แก้ไข</button>
+      </div>
     `;
     div.querySelector('button.danger').onclick = async ()=>{
       if(confirm('ลบสัญลักษณ์นี้ออกจากฐานข้อมูล?')){
@@ -379,6 +416,7 @@ async function refreshLibraryUI(){
         refreshLibraryUI();
       }
     };
+    div.querySelector('button[data-bundle-id]').onclick = ()=> openBundleEditor(sym.id);
     libraryList.appendChild(div);
   });
 }
@@ -469,6 +507,80 @@ async function addSymbolFromDataURL(dataURL, w, h){
   refreshLibraryUI();
 }
 
+/* ============ Item bundle editor: attach extra BOQ rows to a symbol ============ */
+let bundleEditingSymId = null;
+
+function openBundleEditor(symId){
+  bundleEditingSymId = symId;
+  const sym = symbols.find(s=>s.id===symId);
+  document.getElementById('bundleModalSubtitle').innerHTML = `สำหรับสัญลักษณ์ <b style="color:${sym.color}">${sym.code}</b> ${sym.name} — ทุกครั้งที่ตรวจพบสัญลักษณ์นี้ในภาพ รายการด้านล่างจะถูกนับรวมเพิ่มโดยอัตโนมัติ (คูณตามจำนวนที่พบ)`;
+  document.getElementById('bundleSearch').value = '';
+  document.getElementById('bundleSearchResults').innerHTML = '';
+  renderBundleCurrentList();
+  document.getElementById('bundleModalOverlay').style.display = 'flex';
+}
+
+function renderBundleCurrentList(){
+  const sym = symbols.find(s=>s.id===bundleEditingSymId);
+  const bundle = sym.bundle || [];
+  const wrap = document.getElementById('bundleCurrentList');
+  if(bundle.length===0){
+    wrap.innerHTML = '<div class="empty">ยังไม่มีรายการเพิ่มเติม</div>';
+    return;
+  }
+  wrap.innerHTML = bundle.map((b,idx)=>`
+    <div class="row" style="align-items:center;gap:6px;margin-bottom:6px;">
+      <div style="flex:1;font-size:12px;"><b style="color:var(--accent)">${b.code}</b> ${b.name}<br><span style="color:var(--muted);">${b.unit||''}${b.price!=null?' · ฿'+fmtMoney(b.price):''}</span></div>
+      <input type="number" min="1" step="1" value="${b.qty}" data-idx="${idx}" class="bundle-qty" style="width:60px;">
+      <button class="danger" data-idx="${idx}" style="padding:4px 8px;font-size:11px;">ลบ</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.bundle-qty').forEach(inp=>{
+    inp.onchange = async ()=>{
+      const idx = Number(inp.dataset.idx);
+      const sym = symbols.find(s=>s.id===bundleEditingSymId);
+      sym.bundle[idx].qty = Math.max(1, parseInt(inp.value)||1);
+      await updateSymbolInDB(sym);
+    };
+  });
+  wrap.querySelectorAll('button.danger').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const idx = Number(btn.dataset.idx);
+      const sym = symbols.find(s=>s.id===bundleEditingSymId);
+      sym.bundle.splice(idx,1);
+      await updateSymbolInDB(sym);
+      renderBundleCurrentList();
+    };
+  });
+}
+
+document.getElementById('bundleSearch').oninput = (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  const container = document.getElementById('bundleSearchResults');
+  if(priceList.length===0){ container.innerHTML = '<div class="empty">ยังไม่ได้นำเข้าตารางราคา — เลื่อนลงไปที่ "ฐานข้อมูลราคา/รหัส" ด้านล่างของหน้าก่อน</div>'; return; }
+  const results = priceList.filter(r=> !q || r.code.toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q)).slice(0,40);
+  container.innerHTML = results.map(r=>`
+    <div class="price-row" data-id="${r.id}">
+      <b style="color:var(--accent)">${r.code}</b> ${r.name||''}
+      <div style="color:var(--muted);">${r.unit||''}${r.price!=null?' · ฿'+fmtMoney(r.price):''}</div>
+    </div>`).join('') || '<div class="empty">ไม่พบรายการที่ตรงกับคำค้นหา</div>';
+  container.querySelectorAll('.price-row').forEach(el=>{
+    el.onclick = async ()=>{
+      const id = parseInt(el.dataset.id);
+      const row = priceList.find(r=>r.id===id);
+      const sym = symbols.find(s=>s.id===bundleEditingSymId);
+      sym.bundle = sym.bundle || [];
+      sym.bundle.push({code:row.code, name:row.name, unit:row.unit, price:row.price, qty:1});
+      await updateSymbolInDB(sym);
+      renderBundleCurrentList();
+    };
+  });
+};
+
+document.getElementById('bundleDone').onclick = async ()=>{
+  document.getElementById('bundleModalOverlay').style.display = 'none';
+  await refreshLibraryUI();
+};
+
 document.getElementById('btnUploadSymbol').onclick = ()=>{
   document.getElementById('fileSymbolUpload').click();
 };
@@ -493,6 +605,7 @@ function showStageCanvas(){
   const idBtn = document.getElementById('btnToggleIdentify');
   idBtn.style.display = 'inline-block';
   idBtn.disabled = !cvReady;
+  document.getElementById('btnToggleZone').style.display = 'inline-block';
 }
 
 function fitCanvasesToStage(w,h){
@@ -507,6 +620,7 @@ async function startScreenShare(){
     await video.play();
     fitCanvasesToStage(video.videoWidth, video.videoHeight);
     drawVideoFrameToStage();
+    zones = []; refreshZoneListUI(); // new source, old zone coordinates no longer apply
     showStageCanvas();
     stageStatus.textContent = 'กำลังแชร์หน้าจอสด — กด "จับภาพเฟรมปัจจุบัน" หรือเปิดโหมดวิเคราะห์ต่อเนื่อง';
     document.getElementById('btnCaptureFrame').disabled = false;
@@ -546,6 +660,7 @@ document.getElementById('fileplanUpload').onchange = (e)=>{
     img.onload = ()=>{
       fitCanvasesToStage(img.width, img.height);
       stage.getContext('2d').drawImage(img,0,0);
+      zones = []; refreshZoneListUI(); // new source, old zone coordinates no longer apply
       clearOverlay();
       showStageCanvas();
       stageStatus.textContent = 'โหลดภาพแบบแปลนแล้ว — พร้อมวิเคราะห์';
@@ -556,13 +671,14 @@ document.getElementById('fileplanUpload').onchange = (e)=>{
   e.target.value='';
 };
 
-/* ============ Interaction mode: 'none' | 'crop' | 'identify' ============ */
+/* ============ Interaction mode: 'none' | 'crop' | 'identify' | 'zone' ============ */
 let interactionMode = 'none';
 const identifyTooltip = document.getElementById('identifyTooltip');
 
 /* ---- Crop mode: select region to save as new symbol ---- */
 document.getElementById('btnStartCrop').onclick = ()=>{
   if(interactionMode==='identify'){ document.getElementById('btnToggleIdentify').click(); }
+  if(interactionMode==='zone'){ document.getElementById('btnToggleZone').click(); }
   interactionMode = 'crop';
   cropMode = true;
   document.getElementById('cropHint').style.display='block';
@@ -578,13 +694,13 @@ document.getElementById('btnCancelCrop').onclick = ()=>{
   cropOverlay.getContext('2d').clearRect(0,0,cropOverlay.width,cropOverlay.height);
 };
 cropOverlay.addEventListener('mousedown', e=>{
-  if(interactionMode!=='crop') return;
+  if(interactionMode!=='crop' && interactionMode!=='zone') return;
   const rect = cropOverlay.getBoundingClientRect();
   const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
   cropStart = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
 });
 cropOverlay.addEventListener('mousemove', e=>{
-  if(interactionMode==='crop'){
+  if(interactionMode==='crop' || interactionMode==='zone'){
     if(!cropStart) return;
     const rect = cropOverlay.getBoundingClientRect();
     const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
@@ -592,16 +708,28 @@ cropOverlay.addEventListener('mousemove', e=>{
     cropRect = { x:Math.min(cropStart.x,cur.x), y:Math.min(cropStart.y,cur.y), w:Math.abs(cur.x-cropStart.x), h:Math.abs(cur.y-cropStart.y) };
     const ctx = cropOverlay.getContext('2d');
     ctx.clearRect(0,0,cropOverlay.width,cropOverlay.height);
-    ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 2;
+    ctx.strokeStyle = interactionMode==='zone' ? '#ffb64f' : '#4f8cff'; ctx.lineWidth = 2;
     ctx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
   } else if(interactionMode==='identify'){
     scheduleIdentify(e);
   }
 });
 cropOverlay.addEventListener('mouseup', ()=>{
-  if(interactionMode!=='crop') return;
-  cropStart = null;
-  document.getElementById('btnSaveCrop').disabled = !(cropRect && cropRect.w>3 && cropRect.h>3);
+  if(interactionMode==='crop'){
+    cropStart = null;
+    document.getElementById('btnSaveCrop').disabled = !(cropRect && cropRect.w>3 && cropRect.h>3);
+  } else if(interactionMode==='zone'){
+    cropStart = null;
+    if(cropRect && cropRect.w>3 && cropRect.h>3){
+      const label = prompt('ระบุขนาดท่อของโซนนี้ (เช่น 160 หรือ 160mm):');
+      if(label && label.trim()){
+        zones.push({id:Date.now(), x:cropRect.x, y:cropRect.y, w:cropRect.w, h:cropRect.h, sizeLabel:label.trim()});
+        refreshZoneListUI();
+      }
+    }
+    cropRect = null;
+    cropOverlay.getContext('2d').clearRect(0,0,cropOverlay.width,cropOverlay.height);
+  }
 });
 cropOverlay.addEventListener('mouseleave', ()=>{
   identifyTooltip.style.display='none';
@@ -620,6 +748,7 @@ document.getElementById('btnToggleIdentify').onclick = ()=>{
     identifyTooltip.style.display='none';
   } else {
     if(interactionMode==='crop'){ document.getElementById('btnCancelCrop').click(); }
+    if(interactionMode==='zone'){ document.getElementById('btnToggleZone').click(); }
     if(symbols.length===0){ alert('กรุณาเพิ่มสัญลักษณ์ในฐานข้อมูลก่อน ระบบถึงจะมีอะไรให้เทียบ'); return; }
     interactionMode = 'identify';
     cropOverlay.style.pointerEvents='auto';
@@ -629,6 +758,49 @@ document.getElementById('btnToggleIdentify').onclick = ()=>{
     hint.style.display='block';
   }
 };
+
+/* ---- Zone mode: draw a rectangle over a section of pipe and tag it with a size ---- */
+document.getElementById('btnToggleZone').onclick = ()=>{
+  const btn = document.getElementById('btnToggleZone');
+  const hint = document.getElementById('zoneHint');
+  if(interactionMode==='zone'){
+    interactionMode = 'none';
+    cropOverlay.style.pointerEvents='none';
+    btn.textContent = '📏 กำหนดโซนขนาดท่อ';
+    btn.classList.remove('danger');
+    hint.style.display='none';
+  } else {
+    if(interactionMode==='crop'){ document.getElementById('btnCancelCrop').click(); }
+    if(interactionMode==='identify'){ document.getElementById('btnToggleIdentify').click(); }
+    interactionMode = 'zone';
+    cropOverlay.style.pointerEvents='auto';
+    cropOverlay.style.cursor='cell';
+    btn.textContent = '✖ ปิดโหมดกำหนดโซน';
+    btn.classList.add('danger');
+    hint.style.display='block';
+  }
+};
+
+function refreshZoneListUI(){
+  const wrap = document.getElementById('zoneListWrap');
+  if(zones.length===0){
+    wrap.innerHTML = '';
+  } else {
+    wrap.innerHTML = '<div class="hint" style="margin-top:6px;">โซนที่กำหนดไว้ในภาพนี้:</div>' + zones.map(z=>`
+      <div class="row" style="align-items:center;gap:6px;margin-top:4px;">
+        <span style="flex:1;font-size:12px;color:var(--warn);">📏 ${z.sizeLabel} มม.</span>
+        <button class="danger" data-zid="${z.id}" style="padding:3px 8px;font-size:11px;">ลบ</button>
+      </div>`).join('');
+    wrap.querySelectorAll('button[data-zid]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const zid = Number(btn.dataset.zid);
+        zones = zones.filter(z=>z.id!==zid);
+        refreshZoneListUI();
+      };
+    });
+  }
+  clearOverlay();
+}
 
 let identifyBusy = false;
 function scheduleIdentify(e){
@@ -723,6 +895,28 @@ document.getElementById('btnSaveCrop').onclick = ()=>{
 /* ============ Overlay drawing ============ */
 function clearOverlay(){
   overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height);
+  drawZonesOnOverlay();
+}
+function drawZonesOnOverlay(){
+  if(zones.length===0) return;
+  const ctx = overlay.getContext('2d');
+  ctx.save();
+  zones.forEach(z=>{
+    ctx.setLineDash([6,4]);
+    ctx.strokeStyle = '#ffb64f'; ctx.lineWidth = 2;
+    ctx.strokeRect(z.x, z.y, z.w, z.h);
+    ctx.fillStyle = 'rgba(255,182,79,0.12)';
+    ctx.fillRect(z.x, z.y, z.w, z.h);
+    ctx.setLineDash([]);
+    const label = z.sizeLabel+' มม.';
+    ctx.font = 'bold 11px sans-serif';
+    const tw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = '#ffb64f';
+    ctx.fillRect(z.x, Math.max(0,z.y-16), tw, 16);
+    ctx.fillStyle = '#000';
+    ctx.fillText(label, z.x+4, Math.max(11,z.y-4));
+  });
+  ctx.restore();
 }
 function drawBox(box, color, label){
   const ctx = overlay.getContext('2d');
@@ -800,7 +994,21 @@ async function analyzeStage(){
   }
 
   frameMat.delete(); frameGray.delete();
-  renderResults(counts);
+  const bundleRows = computeBundleRows(counts);
+  renderResults(counts, bundleRows);
+}
+
+function computeBundleRows(counts){
+  const map = {};
+  symbols.forEach(sym=>{
+    const c = counts[sym.id]||0;
+    if(c<=0 || !sym.bundle || sym.bundle.length===0) return;
+    sym.bundle.forEach(b=>{
+      if(!map[b.code]) map[b.code] = {code:b.code, name:b.name, unit:b.unit, price:b.price, qty:0};
+      map[b.code].qty += c*b.qty;
+    });
+  });
+  return Object.values(map);
 }
 
 function loadImage(src){
@@ -811,8 +1019,9 @@ function loadImage(src){
   });
 }
 
-function renderResults(counts){
+function renderResults(counts, bundleRows){
   lastCounts = counts;
+  lastBundleRows = bundleRows || [];
   const body = document.getElementById('resultBody');
   body.innerHTML='';
   let total=0, grandValue=0, hasPricing=false;
@@ -827,7 +1036,14 @@ function renderResults(counts){
     tr.innerHTML = `<td style="color:${sym.color};font-weight:700;">${sym.code}</td><td>${sym.name}</td><td>${sym.unit||'-'}</td><td style="text-align:right;">${c}</td><td style="text-align:right;">${fmtMoney(sym.price)}</td><td style="text-align:right;">${fmtMoney(rowTotal)}</td>`;
     body.appendChild(tr);
   });
-  if(symbols.length===0) body.innerHTML='<tr><td colspan="6" class="empty">ยังไม่มีผลวิเคราะห์</td></tr>';
+  lastBundleRows.forEach(b=>{
+    const rowTotal = (b.price!=null) ? b.qty*b.price : null;
+    if(rowTotal!=null){ grandValue += rowTotal; hasPricing = true; }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:var(--accent2);font-weight:700;">${b.code}</td><td>${b.name} <span style="color:var(--muted);font-size:11px;">(อุปกรณ์แนบ)</span></td><td>${b.unit||'-'}</td><td style="text-align:right;">${b.qty}</td><td style="text-align:right;">${fmtMoney(b.price)}</td><td style="text-align:right;">${fmtMoney(rowTotal)}</td>`;
+    body.appendChild(tr);
+  });
+  if(symbols.length===0 && lastBundleRows.length===0) body.innerHTML='<tr><td colspan="6" class="empty">ยังไม่มีผลวิเคราะห์</td></tr>';
   document.getElementById('totalCount').textContent = total;
   const valueBox = document.getElementById('totalValueBox');
   if(hasPricing){
@@ -847,6 +1063,11 @@ document.getElementById('btnExportExcel').onclick = ()=>{
     const rowTotal = (sym.price!=null) ? qty*sym.price : '';
     if(sym.price!=null) grandTotal += qty*sym.price;
     data.push([sym.code, sym.name, sym.unit||'', qty, sym.price??'', rowTotal]);
+  });
+  (lastBundleRows||[]).forEach(b=>{
+    const rowTotal = (b.price!=null) ? b.qty*b.price : '';
+    if(b.price!=null) grandTotal += b.qty*b.price;
+    data.push([b.code, b.name+' (อุปกรณ์แนบ)', b.unit||'', b.qty, b.price??'', rowTotal]);
   });
   data.push(['','','','','รวมทั้งหมด', grandTotal||0]);
   const ws = XLSX.utils.aoa_to_sheet(data);
