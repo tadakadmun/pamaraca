@@ -2,2026 +2,1090 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ส่องพระ AI — ส่อง เทียบพิมพ์ เทียบตำหนิ</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Pridi:wght@400;600&family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blueprint Symbol Scanner - ส่องแบบแปลนหาสัญลักษณ์</title>
 <style>
   :root{
-    --bg:#151007;
-    --surface:#221A0E;
-    --surface2:#2C2213;
-    --line:#3D2F1F;
-    --gold:#D9A441;
-    --gold-soft:#B8893A;
-    --text:#F2E8D5;
-    --muted:#9A8A6C;
-    --high:#8FBC5A;
-    --low:#D06A56;
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1d2740; --border:#2a3654;
+    --text:#e8ecf5; --muted:#8a94ad; --accent:#4f8cff; --accent2:#7c5cff;
+    --good:#3ddc97; --warn:#ffb64f; --bad:#ff5c7a;
   }
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%}
-  body{
-    background:var(--bg);
-    color:var(--text);
-    font-family:'Noto Sans Thai',sans-serif;
-    display:flex;flex-direction:column;align-items:center;
-    padding:20px 16px 40px;
-  }
-  header{text-align:center;margin-bottom:18px}
-  header h1{
-    font-family:'Pridi',serif;font-weight:600;font-size:1.7rem;color:var(--gold);
-    letter-spacing:.5px;
-  }
-  header p{font-size:.8rem;color:var(--muted);margin-top:2px}
-
-  .card{
-    width:100%;max-width:430px;background:var(--surface);
-    border:1px solid var(--line);border-radius:18px;padding:20px;
-  }
-  .btn{
-    width:100%;margin-top:14px;padding:15px;border:none;border-radius:12px;
-    background:var(--gold);color:#1A1206;font-family:'Noto Sans Thai',sans-serif;
-    font-size:1.05rem;font-weight:700;cursor:pointer;
-  }
-  .btn:active{background:var(--gold-soft)}
-  .btn:disabled{opacity:.45}
-  .btn.secondary{background:transparent;border:1px solid #4A3A24;color:var(--muted);font-weight:500;font-size:.9rem;padding:12px}
-  .btn.danger{background:transparent;border:1px solid #5A3327;color:var(--low);font-weight:500;font-size:.85rem;padding:10px}
-  .btn.small{width:auto;padding:8px 14px;font-size:.8rem;margin-top:0}
-  .hint{font-size:.75rem;color:var(--muted);margin-top:10px;line-height:1.7}
-  .page{display:none;width:100%;max-width:430px;flex-direction:column;align-items:center}
-  .page.on{display:flex}
-
-  /* ---- ฐานข้อมูล ---- */
-  .dbcount{
-    display:flex;align-items:baseline;gap:10px;justify-content:center;
-    padding:6px 0 14px;border-bottom:1px solid var(--line);margin-bottom:6px;
-  }
-  .dbcount b{font-family:'Pridi',serif;font-size:2.2rem;color:var(--gold);font-weight:600}
-  .dbcount span{font-size:.85rem;color:var(--muted)}
-  #thumbs{
-    display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:12px;
-    max-height:132px;overflow-y:auto;width:100%;
-  }
-  #thumbs .th{position:relative;cursor:pointer}
-  #thumbs img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
-  #thumbs .pb{
-    position:absolute;left:2px;right:2px;bottom:2px;font-size:.52rem;text-align:center;
-    background:rgba(21,16,7,.8);color:var(--gold);border-radius:6px;padding:1px 0;
-  }
-  .hiddenInput{display:none}
-
-  /* ---- เกณฑ์ราคา ---- */
-  .limitrow{
-    display:flex;align-items:center;gap:10px;margin-top:14px;width:100%;
-    background:var(--surface2);border:1px solid #4A3A24;border-radius:12px;padding:10px 14px;
-  }
-  .limitrow label{font-size:.82rem;color:var(--text);flex-shrink:0}
-  .limitrow input{
-    flex:1;min-width:0;padding:8px 10px;border-radius:9px;border:1px solid #4A3A24;
-    background:var(--surface);color:var(--gold);font-size:.95rem;font-weight:700;
-    outline:none;text-align:right;font-family:'Noto Sans Thai',sans-serif;
-  }
-  .limitrow input:focus{border-color:var(--gold)}
-  .limitrow span{font-size:.8rem;color:var(--muted)}
-
-  .pastezone{
-    width:100%;margin-top:14px;padding:15px;border-radius:12px;
-    border:1px dashed #4A3A24;background:transparent;color:var(--muted);
-    font-family:'Noto Sans Thai',sans-serif;font-size:.9rem;text-align:center;
-    outline:none;-webkit-user-select:text;user-select:text;caret-color:transparent;
-    min-height:22px;cursor:text;line-height:1.5;
-  }
-  .pastezone:empty:before{content:attr(data-placeholder)}
-  .pastezone:focus{border-color:var(--gold);color:var(--text)}
-
-  /* ---- กล้อง ---- */
-  .scope{
-    position:relative;width:100%;aspect-ratio:1/1;
-    border-radius:18px;overflow:hidden;background:#000;
-    border:1px solid var(--line);
-  }
-  .scope video{width:100%;height:100%;object-fit:cover;display:block}
-  .scope .corner{position:absolute;width:26px;height:26px;border-color:var(--gold);border-style:solid;opacity:.85}
-  .c1{top:12px;left:12px;border-width:2px 0 0 2px;border-radius:6px 0 0 0}
-  .c2{top:12px;right:12px;border-width:2px 2px 0 0;border-radius:0 6px 0 0}
-  .c3{bottom:12px;left:12px;border-width:0 0 2px 2px;border-radius:0 0 0 6px}
-  .c4{bottom:12px;right:12px;border-width:0 2px 2px 0;border-radius:0 0 6px 0}
-  #seen{
-    position:absolute;right:10px;bottom:10px;width:74px;height:74px;
-    border-radius:10px;border:1px solid var(--gold);opacity:.92;background:#222;
-  }
-  .seenlabel{
-    position:absolute;right:10px;bottom:88px;font-size:.58rem;color:#E8DCC2;
-    background:rgba(21,16,7,.72);padding:2px 7px;border-radius:7px;
-  }
-
-  .roiLayer{position:absolute;inset:0;display:none;touch-action:none;cursor:crosshair}
-  .roiLayer.active{display:block}
-  #roiBox{
-    position:absolute;border:2px dashed var(--gold);background:rgba(217,164,65,.14);
-    display:none;pointer-events:none;border-radius:4px;
-  }
-
-  #shotStrip{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px}
-  .shotThumb{
-    position:relative;flex:0 0 auto;width:76px;height:76px;border-radius:10px;
-    overflow:hidden;border:1px solid var(--line);cursor:pointer;background:var(--surface2);
-  }
-  .shotThumb img{width:100%;height:100%;object-fit:cover;display:block}
-  .shotThumb .del{
-    position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
-    background:rgba(21,16,7,.88);color:var(--low);font-size:.62rem;font-weight:700;
-    display:flex;align-items:center;justify-content:center;
-  }
-
-  .zoomrow{
-    display:flex;align-items:center;gap:12px;width:100%;
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;
-    padding:10px 16px;margin-top:10px;
-  }
-  .zoomrow label{font-size:.8rem;color:var(--muted);flex-shrink:0}
-  .zoomrow input[type=range]{flex:1;accent-color:var(--gold);height:26px}
-  .zoomrow b{font-size:.9rem;color:var(--gold);width:44px;text-align:right;flex-shrink:0}
-
-  .verdict{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
-    background:var(--surface);border:1px solid var(--line);border-radius:18px;
-    padding:16px 14px;margin-top:14px;
-  }
-  .ring{position:relative;width:92px;height:92px;flex-shrink:0}
-  .ring svg{transform:rotate(-90deg)}
-  .ring .track{stroke:#3A2E1B;fill:none;stroke-width:7}
-  .ring .fill{fill:none;stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .3s,stroke .3s;stroke:var(--gold)}
-  .ring .num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .ring .num b{font-size:1.3rem;font-weight:700;line-height:1}
-  .ring .num span{font-size:.6rem;color:var(--muted);margin-top:3px}
-
-  .match{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
-  .match img{
-    width:72px;height:72px;object-fit:cover;border-radius:10px;
-    border:2px solid var(--gold);background:var(--surface2);
-  }
-  .match span{font-size:.62rem;color:var(--muted);text-align:center;line-height:1.4}
-
-  .pricebar{
-    width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);
-    border-radius:14px;padding:12px 16px;text-align:center;
-  }
-  .pricebar b{font-family:'Pridi',serif;font-size:1.25rem;font-weight:600}
-  .pricebar small{display:block;font-size:.68rem;color:var(--muted);margin-top:2px}
-
-  /* ---- หน้าองค์ครู ---- */
-  #masterGrid{
-    display:grid;grid-template-columns:repeat(2,1fr);gap:12px;width:100%;margin-top:6px;
-  }
-  .mcard{
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;
-    overflow:hidden;cursor:pointer;
-  }
-  .mcard img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#111}
-  .mcard .mn{padding:8px 10px;font-size:.8rem;line-height:1.4}
-  .mcard .mn small{display:block;color:var(--muted);font-size:.65rem}
-
-  /* ---- หน้าเทียบ ---- */
-  .wshead{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
-    margin-bottom:10px;
-  }
-  .wshead b{font-family:'Pridi',serif;font-size:1.05rem;color:var(--gold);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tabs{display:flex;gap:6px;width:100%;margin-bottom:10px}
-  .tabs button{
-    flex:1;padding:10px 4px;border-radius:10px;border:1px solid var(--line);
-    background:var(--surface);color:var(--muted);font-family:'Noto Sans Thai',sans-serif;
-    font-size:.8rem;font-weight:500;cursor:pointer;
-  }
-  .tabs button.on{background:var(--gold);color:#1A1206;font-weight:700;border-color:var(--gold)}
-
-  .dual{display:flex;gap:8px;width:100%}
-  .dual .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
-  .dual canvas{width:100%;aspect-ratio:1/1;border-radius:12px;border:1px solid var(--line);background:#111;touch-action:none;display:block}
-  .dual .cl{font-size:.65rem;color:var(--muted);text-align:center}
-  #ovWrap{width:100%;display:none}
-  #ovCanvas{width:100%;aspect-ratio:1/1;border-radius:12px;border:1px solid var(--line);background:#111;touch-action:none;display:block}
-
-  .ctlrow{
-    display:flex;align-items:center;gap:12px;width:100%;
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;
-    padding:10px 16px;margin-top:10px;
-  }
-  .ctlrow label{font-size:.78rem;color:var(--muted);flex-shrink:0}
-  .ctlrow input[type=range]{flex:1;accent-color:var(--gold);height:26px}
-  .ctlrow b{font-size:.85rem;color:var(--gold);width:44px;text-align:right;flex-shrink:0}
-
-  #pinPanel{width:100%;display:none;margin-top:10px}
-  .pinrow{
-    display:flex;align-items:center;gap:10px;background:var(--surface);
-    border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-top:8px;
-  }
-  .pinrow .no{
-    width:24px;height:24px;border-radius:50%;background:var(--gold);color:#1A1206;
-    font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  }
-  .pinrow .lb{flex:1;min-width:0;font-size:.8rem;line-height:1.4}
-  .pinrow button{
-    padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:transparent;
-    color:var(--muted);font-family:'Noto Sans Thai',sans-serif;font-size:.72rem;cursor:pointer;flex-shrink:0;
-  }
-  .pinrow button.ok{border-color:var(--high);color:var(--high)}
-  .pinrow button.no2{border-color:var(--low);color:var(--low)}
-  .pinrow button.sel-ok{background:var(--high);color:#1A1206;font-weight:700}
-  .pinrow button.sel-no{background:var(--low);color:#1A1206;font-weight:700}
-  #pinSummary{margin-top:10px;font-size:.85rem;text-align:center;color:var(--muted)}
-
-  #suspectBar{width:100%;display:flex;gap:8px;margin-top:10px}
-  #suspectBar .btn{margin-top:0;font-size:.82rem;padding:11px}
-
-  #status{font-size:.85rem;color:var(--muted);margin-top:14px;text-align:center;line-height:1.7;max-width:430px}
-  .lighttip{
-    width:100%;margin-top:10px;font-size:.72rem;color:var(--muted);
-    background:var(--surface);border:1px solid var(--line);border-radius:12px;
-    padding:10px 14px;line-height:1.7;text-align:center;
-  }
-  .warn{
-    width:100%;max-width:430px;margin-top:16px;font-size:.72rem;color:var(--muted);
-    line-height:1.7;text-align:center;border-top:1px solid var(--line);padding-top:12px;
-  }
-
-  .homebtn{
-    position:fixed;top:14px;left:14px;z-index:50;
-    width:42px;height:42px;border-radius:50%;
-    background:var(--surface);border:1px solid var(--line);color:var(--gold);
-    display:none;align-items:center;justify-content:center;
-    font-size:1.25rem;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);
-  }
-  .homebtn.show{display:flex}
-
-  .modalOverlay{
-    position:fixed;inset:0;background:rgba(10,7,3,.72);z-index:200;
-    display:none;align-items:center;justify-content:center;padding:20px;
-  }
-  .modalOverlay.show{display:flex}
-  .modalBox{
-    width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);
-    border-radius:16px;padding:20px;
-  }
-  .modalTitle{font-size:.9rem;color:var(--text);line-height:1.6;margin-bottom:12px;white-space:pre-line}
-  .modalInput{
-    width:100%;padding:13px 14px;border-radius:12px;border:1px solid #4A3A24;
-    background:var(--surface2);color:var(--text);font-size:.95rem;outline:none;
-    font-family:'Noto Sans Thai',sans-serif;
-  }
-  .modalInput:focus{border-color:var(--gold)}
-  .modalBtns{display:flex;gap:10px;margin-top:14px}
-  .modalBtns .btn{margin-top:0;flex:1}
-
-  #circleModeBtn.active{background:var(--gold);color:#1A1206;border-color:var(--gold);font-weight:700}
-
-  .helpcard h2{
-    font-family:'Pridi',serif;color:var(--gold);font-size:1.35rem;font-weight:600;
-    margin-bottom:4px;
-  }
-  .helpcard .sub{font-size:.78rem;color:var(--muted);margin-bottom:6px}
-  .helpcard h3{
-    font-family:'Noto Sans Thai',sans-serif;color:var(--gold);font-size:.92rem;
-    font-weight:700;margin:16px 0 5px;padding-top:12px;border-top:1px solid var(--line);
-  }
-  .helpcard h3:first-of-type{border-top:none;padding-top:0;margin-top:10px}
-  .helpcard p{font-size:.82rem;line-height:1.8;color:var(--text);margin-bottom:2px}
-  .helpcard ol, .helpcard ul{margin:4px 0 4px 20px;font-size:.82rem;line-height:1.85;color:var(--text)}
-  .helpcard li{margin-bottom:3px}
-  .helpcard .tag{
-    display:inline-block;font-size:.68rem;color:var(--gold);border:1px solid #4A3A24;
-    border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;
-  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:16px 20px;background:linear-gradient(90deg,#141b2e,#1a2440);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:18px;margin:0;font-weight:600;}
+  header .sub{font-size:12px;color:var(--muted);}
+  #cvStatus{font-size:12px;padding:4px 10px;border-radius:20px;background:#3a2c1a;color:var(--warn);}
+  #cvStatus.ready{background:#123527;color:var(--good);}
+  main{display:grid;grid-template-columns:300px 1fr 300px;gap:14px;padding:14px;max-width:1500px;margin:0 auto;}
+  @media (max-width:1100px){ main{grid-template-columns:1fr;} }
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;}
+  .panel h2{font-size:14px;margin:0 0 10px 0;color:var(--accent);}
+  button{cursor:pointer;border:none;border-radius:8px;padding:9px 12px;font-size:13px;background:var(--accent);color:#fff;font-weight:600;transition:.15s;}
+  button:hover{filter:brightness(1.1);}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  button.danger{background:var(--bad);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  input[type=text],input[type=number],select{width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;margin-top:4px;}
+  label{font-size:12px;color:var(--muted);display:block;margin-top:8px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .symbol-item{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--panel2);}
+  .symbol-item img{width:40px;height:40px;object-fit:contain;background:#fff;border-radius:4px;}
+  .symbol-info{flex:1;min-width:0;}
+  .symbol-info .code{font-weight:700;font-size:13px;color:var(--accent);}
+  .symbol-info .name{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .symbol-item .count-badge{background:var(--accent2);color:#fff;font-size:12px;font-weight:700;padding:3px 8px;border-radius:12px;min-width:22px;text-align:center;}
+  #stageWrap{position:relative;width:100%;background:#000;border-radius:10px;overflow:auto;border:1px solid var(--border);min-height:300px;display:flex;align-items:center;justify-content:center;}
+  #stageWrap canvas{max-width:100%;display:block;}
+  #overlay{position:absolute;top:0;left:0;pointer-events:none;}
+  video{display:none;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px;}
+  .status-line{font-size:12px;color:var(--muted);margin-top:8px;}
+  .toggle-row{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:20px 0;}
+  .divider{height:1px;background:var(--border);margin:12px 0;}
+  #resultTable{width:100%;border-collapse:collapse;font-size:13px;}
+  #resultTable th,#resultTable td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--border);}
+  #resultTable th{color:var(--muted);font-weight:600;}
+  .total-box{background:var(--panel2);border-radius:8px;padding:10px;text-align:center;margin-bottom:10px;}
+  .total-box .num{font-size:28px;font-weight:800;color:var(--good);}
+  .total-box .lbl{font-size:12px;color:var(--muted);}
+  #cropOverlay{position:absolute;top:0;left:0;pointer-events:none;cursor:crosshair;}
+#identifyTooltip{position:absolute;display:none;background:#101826;border:1px solid var(--accent);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;pointer-events:none;z-index:20;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:200;padding:16px;}
+.modal-box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;width:400px;max-width:100%;max-height:88vh;overflow:auto;}
+.modal-box h3{margin:0 0 12px 0;font-size:15px;color:var(--accent);}
+.modal-box img{display:block;max-width:120px;max-height:120px;background:#fff;border-radius:6px;margin:0 auto 12px auto;}
+.price-row{padding:7px 8px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;border-radius:6px;}
+.price-row:hover{background:rgba(79,140,255,.14);}
+.tab-btn.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;}
+#previewTableWrap table{width:100%;border-collapse:collapse;font-size:11px;}
+#previewTableWrap th,#previewTableWrap td{padding:4px 6px;border-bottom:1px solid var(--border);white-space:nowrap;}
+#previewTableWrap th{color:var(--accent);position:sticky;top:0;background:var(--panel2);}
+#captureStageWrap canvas{display:block;}
+#captureCropOverlay{position:absolute;top:0;left:0;cursor:crosshair;}
 </style>
 </head>
 <body>
 
-<button class="homebtn" id="homeBtn" aria-label="กลับหน้าหลัก">←</button>
-
-<div class="modalOverlay" id="modalOverlay">
-  <div class="modalBox">
-    <p class="modalTitle" id="modalTitle"></p>
-    <input type="text" class="modalInput" id="modalInput" autocomplete="off">
-    <div class="modalBtns">
-      <button class="btn secondary" id="modalCancelBtn">ยกเลิก</button>
-      <button class="btn" id="modalOkBtn">ตกลง</button>
-    </div>
-  </div>
-</div>
+<script>
+  // Must be defined before opencv.js loads
+  var cvReady = false;
+  var Module = {
+    onRuntimeInitialized() {
+      cvReady = true;
+      var s = document.getElementById('cvStatus');
+      s.textContent = 'พร้อมใช้งาน (โหลดเสร็จแล้ว)';
+      s.classList.add('ready');
+      document.querySelectorAll('.needs-cv').forEach(b=>b.disabled=false);
+    }
+  };
+</script>
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <header>
-  <h1>ส่องพระ AI</h1>
-  <p>ส่องเทียบพิมพ์ · เทียบตำหนิกับองค์ครู</p>
+  <div>
+    <h1>🔍 Blueprint Symbol Scanner</h1>
+    <div class="sub">ส่องแบบแปลน วิเคราะห์สัญลักษณ์ และนับจำนวนอัตโนมัติ — ประมวลผลในเบราว์เซอร์ทั้งหมด ไม่ส่งข้อมูลออกไปไหน</div>
+  </div>
+  <div id="cvStatus">กำลังโหลดเอนจินวิเคราะห์ภาพ...</div>
 </header>
 
-<!-- ============ หน้าหลัก / ฐานข้อมูล ============ -->
-<div class="page on" id="pgSetup">
-  <div class="card" style="width:100%">
-    <button class="btn secondary" id="helpBtn">📖 คู่มือการใช้งาน</button>
-    <div class="dbcount"><b id="count">0</b><span>รูปพระแท้ในฐานข้อมูล</span></div>
-    <div id="thumbs"></div>
-    <input type="file" id="fileInput" class="hiddenInput" accept="image/*" multiple>
-    <button class="btn" id="addBtn">+ เพิ่มรูปพระแท้</button>
-    <div class="pastezone" id="pasteZone" contenteditable="true" spellcheck="false" data-placeholder="แตะค้างตรงนี้ แล้วเลือก “วาง” เพื่อเพิ่มรูปจากเว็บ"></div>
-    <button class="btn" id="goBtn" disabled>เริ่มส่องพระ</button>
-    <button class="btn secondary" id="goScreenBtn" style="display:none">📺 ส่องจากหน้าจอคอม (ถ้าดูไลฟ์อยู่)</button>
-    <button class="btn" id="compareBtn">🔍 เทียบตำหนิ</button>
-    <button class="btn secondary" id="backupBtn" style="display:none">⬇ สำรองฐานข้อมูลเป็นไฟล์</button>
-    <input type="file" id="restoreInput" class="hiddenInput" accept=".json,application/json">
-    <button class="btn secondary" id="restoreBtn">⬆ กู้คืนจากไฟล์สำรอง</button>
-    <button class="btn danger" id="clearBtn" style="display:none">ล้างฐานข้อมูลทั้งหมด</button>
-    <div class="limitrow">
-      <label>เกณฑ์ราคา</label>
-      <input id="priceLimit" type="number" inputmode="numeric" min="0" placeholder="เช่น 10000">
-      <span>บาท</span>
+<main>
+  <!-- LEFT: Symbol Library -->
+  <div class="panel">
+    <h2>📚 ฐานข้อมูลสัญลักษณ์ (ของคุณ)</h2>
+    <div class="hint">เพิ่มสัญลักษณ์ได้ 2 ทาง: (1) ลากเลือกกรอบจากภาพแบบแปลนที่แสดงอยู่ตรงกลาง หรือ (2) อัปโหลดไฟล์รูปสัญลักษณ์โดยตรง</div>
+    <button class="secondary needs-cv" id="btnUploadSymbol" disabled style="margin-top:10px;width:100%;">➕ อัปโหลดรูปสัญลักษณ์</button>
+    <input type="file" id="fileSymbolUpload" accept="image/*" style="display:none;">
+    <button class="secondary" id="btnCaptureSymbol" style="margin-top:8px;width:100%;">📸 แคปหน้าจอเพื่อเพิ่มสัญลักษณ์</button>
+    <div class="divider"></div>
+    <div id="libraryList"><div class="empty">ยังไม่มีสัญลักษณ์ในฐานข้อมูล</div></div>
+  </div>
+
+  <!-- CENTER: Stage -->
+  <div class="panel">
+    <h2>🖥️ แหล่งภาพแบบแปลน</h2>
+    <div class="row">
+      <button class="needs-cv" id="btnShareScreen" disabled>🖥️ แชร์หน้าจอ (ส่องสด)</button>
+      <button class="secondary" id="btnUploadPlan">🖼️ อัปโหลดภาพแบบแปลน</button>
+      <input type="file" id="fileplanUpload" accept="image/*" style="display:none;">
+      <button class="secondary" id="btnCaptureFrame" disabled>📸 จับภาพเฟรมปัจจุบัน</button>
     </div>
-    <p class="hint">เพิ่มรูปพระแท้ครั้งเดียว ใช้ได้ทั้งส่องและเทียบตำหนิ — เลือกรูปได้ทีละหลายรูป (เลือกจาก Google Drive ได้) แอปถามชื่อรุ่นและราคาหนึ่งครั้งต่อชุด แตะรูปย่อเพื่อแก้ราคาทีละรูป<br><br>ไฟล์สำรองรวมข้อมูลทุกส่วน (รูป ราคา หมุดตำหนิ) — สำรองเก็บใน Google Drive เป็นระยะ</p>
-  </div>
-</div>
+    <div class="status-line" id="stageStatus">ยังไม่มีภาพ — เริ่มด้วยการแชร์หน้าจอ หรืออัปโหลดภาพแบบแปลน</div>
 
-<!-- ============ หน้าส่องพระ ============ -->
-<div class="page" id="pgScan">
-  <div class="scope" id="scope">
-    <video id="cam" playsinline muted></video>
-    <span class="corner c1"></span><span class="corner c2"></span>
-    <span class="corner c3"></span><span class="corner c4"></span>
-    <span class="seenlabel">ภาพที่ระบบเห็น</span>
-    <canvas id="seen" width="224" height="224"></canvas>
-    <div class="roiLayer" id="roiLayer"><div id="roiBox"></div></div>
-  </div>
-
-  <div class="zoomrow" id="zoomRow">
-    <label>ซูม</label>
-    <input type="range" id="zoomSlider" min="1" max="4" step="0.1" value="1">
-    <b id="zoomVal">1.0x</b>
-  </div>
-
-  <div class="ctlrow" id="roiRow" style="display:none">
-    <label style="flex:1">🖱 ลากบนภาพเพื่อเลือกจุดวิเคราะห์ (ไม่บังคับ)</label>
-    <button class="btn small secondary" id="roiResetBtn">รีเซ็ตกรอบ</button>
-  </div>
-
-  <button class="btn" id="capBtn">📸 เก็บภาพนี้ไว้เทียบตำหนิ</button>
-
-  <div id="shotGallery" style="display:none;width:100%">
-    <p class="hint" style="margin:8px 0 4px;text-align:center">แตะภาพเพื่อเลือกไปเทียบตำหนิ · แตะ ✕ เพื่อลบ</p>
-    <div id="shotStrip"></div>
-  </div>
-
-  <div class="verdict">
-    <div class="ring">
-      <svg width="92" height="92" viewBox="0 0 92 92">
-        <circle class="track" cx="46" cy="46" r="39"></circle>
-        <circle class="fill" id="shapeRing" cx="46" cy="46" r="39"
-                stroke-dasharray="245" stroke-dashoffset="245"></circle>
-      </svg>
-      <div class="num"><b id="shapePct">–</b><span>พิมพ์ทรง</span></div>
+    <div id="stageWrap" style="margin-top:10px;">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="stage"></canvas>
+      <canvas id="overlay"></canvas>
+      <canvas id="cropOverlay"></canvas>
+      <div id="identifyTooltip"></div>
+      <div class="empty" id="stageEmpty">ยังไม่มีภาพแสดงผล</div>
     </div>
-    <div class="ring">
-      <svg width="92" height="92" viewBox="0 0 92 92">
-        <circle class="track" cx="46" cy="46" r="39"></circle>
-        <circle class="fill" id="colorRing" cx="46" cy="46" r="39"
-                stroke-dasharray="245" stroke-dashoffset="245"></circle>
-      </svg>
-      <div class="num"><b id="colorPct">–</b><span>โทนสีผิว</span></div>
-    </div>
-    <div class="match">
-      <img id="matchImg" alt="">
-      <span>รูปที่เหมือน<br>ที่สุด</span>
-    </div>
-  </div>
 
-  <div class="pricebar" id="priceBar" style="display:none">
-    <b id="priceText">–</b>
-    <small id="priceSub"></small>
-  </div>
-
-  <p class="lighttip">ระบบครอปเฉพาะองค์พระให้อัตโนมัติก่อนเทียบ — แถบซูมช่วยตอนองค์พระเล็กมากในจอเท่านั้น · % เข้าตาแล้วกด 📸 เพื่อเก็บภาพไปเทียบตำหนิกับองค์ครูต่อ (โหมดหน้าจอคอม: ลากกรอบเลือกจุดวิเคราะห์ได้, เก็บภาพได้หลายรูปแล้วค่อยเลือกทีหลัง, กด Spacebar แทนการคลิกได้)</p>
-
-  <button class="btn secondary" id="stopBtn">หยุดกล้อง / กลับหน้าหลัก</button>
-</div>
-
-<!-- ============ หน้ารายการองค์ครู ============ -->
-<div class="page" id="pgMasters">
-  <div class="card" style="width:100%">
-    <div class="dbcount"><b id="mcount">0</b><span>รูปพระแท้พร้อมเทียบตำหนิ</span></div>
-    <div id="masterGrid"></div>
-    <p class="hint">รายการนี้มาจากรูปพระแท้ที่เพิ่มไว้ในหน้าหลักโดยอัตโนมัติ ไม่ต้องอัปโหลดซ้ำ · แตะรูปเพื่อเข้าโหมดเทียบ · รูปที่ติดป้าย (รูปย่อ) คือรูปจากข้อมูลรุ่นเก่าซึ่งซูมได้จำกัด — ถ้าอยากให้คมสุด ลบรูปนั้นแล้วเพิ่มไฟล์ต้นฉบับใหม่จากหน้าหลัก</p>
-    <button class="btn secondary" id="mastersBackBtn">← กลับหน้าหลัก</button>
-  </div>
-</div>
-
-<!-- ============ หน้าเทียบตำหนิ ============ -->
-<div class="page" id="pgCompare">
-  <div class="wshead">
-    <b id="wsName">องค์ครู</b>
-    <button class="btn small secondary" id="renameMasterBtn">ชื่อ</button>
-    <button class="btn small danger" id="delMasterBtn">ลบ</button>
-  </div>
-
-  <div class="pricebar" id="wsMatchBar" style="display:none;margin:0 0 10px">
-    <b id="wsMatchPct">–</b>
-    <small id="wsMatchSub"></small>
-  </div>
-
-  <div class="tabs">
-    <button id="tabDual" class="on">เทียบคู่</button>
-    <button id="tabOverlay">ภาพซ้อน</button>
-    <button id="tabPins">หมุดตำหนิ</button>
-  </div>
-  <p class="hint" style="text-align:center;margin:-4px 0 0"><b>แท็บเทียบคู่:</b> คลิก/แตะจุดที่สงสัยบนรูปฝั่งไหนก็ได้ ซูมเทียบทันที · <b>แท็บหมุดตำหนิ:</b> กดค้างเพื่อซูมเทียบจุด (คลิกเดียวไว้ปักหมุด)</p>
-
-  <div id="circleModeRow" style="display:flex;gap:8px;width:100%;margin-top:8px">
-    <button class="btn secondary" id="circleModeBtn" style="margin-top:0;flex:1">🎯 วาดวงกลมเน้นตำหนิ</button>
-    <button class="btn secondary" id="circleClearBtn" style="margin-top:0;display:none;flex:0 0 auto">✕ ล้างวง</button>
-  </div>
-
-  <div class="dual" id="dualWrap">
-    <div class="col">
-      <canvas id="cvMaster" width="600" height="600"></canvas>
-      <span class="cl">องค์ครู (ต้นฉบับ)</span>
-    </div>
-    <div class="col">
-      <canvas id="cvSuspect" width="600" height="600"></canvas>
-      <span class="cl">องค์ที่ตรวจสอบ</span>
-    </div>
-  </div>
-
-  <div id="focusPanel" style="display:none;width:100%">
-    <div class="dual" style="margin-top:10px">
-      <div class="col">
-        <canvas id="cvFocusMaster" width="320" height="320"></canvas>
-        <span class="cl">จุดที่กดค้าง (องค์ครู)</span>
-      </div>
-      <div class="col">
-        <canvas id="cvFocusSuspect" width="320" height="320"></canvas>
-        <span class="cl">จุดที่กดค้าง (องค์ตรวจสอบ)</span>
+    <div class="hint" id="cropHint" style="display:none;">
+      ✏️ โหมดเลือกกรอบสัญลักษณ์: ลากเมาส์บนภาพเพื่อเลือกกรอบสัญลักษณ์ที่ต้องการเพิ่มเข้าฐานข้อมูล แล้วกด "บันทึกเป็นสัญลักษณ์ใหม่"
+      <div class="row" style="margin-top:6px;">
+        <button id="btnSaveCrop" class="secondary" disabled>💾 บันทึกเป็นสัญลักษณ์ใหม่</button>
+        <button id="btnCancelCrop" class="secondary">✖ ยกเลิกโหมดเลือกกรอบ</button>
       </div>
     </div>
-    <div class="pricebar" style="margin-top:8px">
-      <b id="focusPct">–</b>
-      <small>ความใกล้เคียงเฉพาะจุดนี้</small>
+    <button class="secondary" id="btnStartCrop" style="margin-top:8px;display:none;">✂️ เข้าสู่โหมดเลือกกรอบสัญลักษณ์จากภาพนี้</button>
+    <button class="secondary needs-cv" id="btnToggleIdentify" disabled style="margin-top:8px;display:none;">🎯 เปิดโหมดชี้ระบุสัญลักษณ์แบบเรียลไทม์</button>
+    <div class="hint" id="identifyHint" style="display:none;">👆 เอาเมาส์ไปวางเหนือสัญลักษณ์บนภาพ ระบบจะบอกทันทีว่านี่คือสัญลักษณ์อะไร (เทียบกับฐานข้อมูลของคุณ)</div>
+
+    <div class="divider"></div>
+    <div class="row" style="align-items:center;">
+      <label style="margin:0;flex:1;min-width:150px;">ระดับความเหมือน (Threshold)
+        <input type="number" id="threshold" min="0.4" max="0.99" step="0.01" value="0.75">
+      </label>
+      <label style="margin:0;flex:1;min-width:150px;">ทุกกี่วินาที (โหมดต่อเนื่อง)
+        <input type="number" id="intervalSec" min="1" max="30" step="1" value="3">
+      </label>
     </div>
-    <p class="hint" style="text-align:center;margin-top:4px">ระบบปรับขนาดองค์พระในภาพให้เท่ากัน และปรับความสว่าง/โทนสีให้ใกล้เคียงกันก่อนเทียบอัตโนมัติ (ไม่ว่ารูปต้นฉบับจะซูมใกล้ไกลหรือแสงต่างกันแค่ไหน) แล้วค่อยคำนวณ % — ตำแหน่งจุดยังเทียบแบบสัดส่วน ถ้าสองรูปถ่ายมุมต่างกันมาก จุดอาจไม่ตรงเป๊ะ ลองกดค้างซ้ำใกล้ๆ จุดเดิมเพื่อขยับได้</p>
-  </div>
-
-  <div id="ovWrap">
-    <canvas id="ovCanvas" width="800" height="800"></canvas>
-    <div class="ctlrow">
-      <label>ความเข้มองค์ครู</label>
-      <input type="range" id="opSlider" min="0" max="100" value="50">
-      <b id="opVal">50%</b>
+    <div class="toggle-row">
+      <input type="checkbox" id="shapeOnlyToggle" checked>
+      <label style="margin:0;" for="shapeOnlyToggle">🎯 จับคู่แบบไม่สนใจสี (เน้นรูปทรง/ลวดลายเส้นเท่านั้น)</label>
     </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="continuousToggle" disabled>
+      <label style="margin:0;" for="continuousToggle">🔄 วิเคราะห์ต่อเนื่องอัตโนมัติ (ขณะแชร์หน้าจอ)</label>
+    </div>
+    <button class="needs-cv" id="btnAnalyze" disabled style="margin-top:10px;width:100%;">🔎 วิเคราะห์สัญลักษณ์ในภาพนี้</button>
   </div>
 
-  <div class="ctlrow">
-    <label>ซูม</label>
-    <input type="range" id="wsZoom" min="1" max="6" step="0.1" value="1">
-    <b id="wsZoomVal">1.0x</b>
+  <!-- RIGHT: Results -->
+  <div class="panel">
+    <h2>📊 สรุปผล</h2>
+    <div class="total-box">
+      <div class="num" id="totalCount">0</div>
+      <div class="lbl">จำนวนสัญลักษณ์ทั้งหมดที่พบในภาพนี้</div>
+    </div>
+    <div class="total-box" id="totalValueBox" style="display:none;">
+      <div class="num" id="totalValue" style="color:var(--accent2);">0</div>
+      <div class="lbl">มูลค่ารวมโดยประมาณ (บาท)</div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table id="resultTable">
+      <thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th><th style="text-align:right;">จำนวน</th><th style="text-align:right;">ราคา/หน่วย</th><th style="text-align:right;">รวม</th></tr></thead>
+      <tbody id="resultBody"><tr><td colspan="6" class="empty">ยังไม่มีผลวิเคราะห์</td></tr></tbody>
+    </table>
+    </div>
+    <button class="secondary" id="btnExportExcel" style="width:100%;margin-top:10px;">📥 ส่งออกผลเป็นไฟล์ Excel</button>
+    <div class="divider"></div>
+    <div class="hint">🔒 ความเป็นส่วนตัว: รูปภาพและฐานข้อมูลสัญลักษณ์ทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเท่านั้น (IndexedDB) ไม่มีการอัปโหลดขึ้นเซิร์ฟเวอร์หรือที่ใดๆ ทั้งสิ้น หากล้างข้อมูลเบราว์เซอร์ ฐานข้อมูลจะหายไปด้วย</div>
   </div>
-  <p class="hint" style="text-align:center;margin-top:6px">ลากนิ้วบนภาพเพื่อเลื่อนดู — สองภาพเลื่อน/ซูมพร้อมกันเสมอ</p>
+</main>
 
-  <div id="suspectBar">
-    <button class="btn secondary" id="useCapBtn" style="display:none">ใช้ภาพที่ถ่ายไว้</button>
-    <input type="file" id="suspectInput" class="hiddenInput" accept="image/*">
-    <button class="btn secondary" id="pickSuspectBtn">เลือกรูปองค์ที่ตรวจสอบ</button>
+<div class="panel" style="max-width:1500px;margin:0 auto 14px auto;">
+  <h2>💰 ฐานข้อมูลราคา/รหัส (นำเข้าจาก Excel)</h2>
+  <div class="hint">นำเข้าตาราง BOQ/ราคาจากไฟล์ Excel เพื่อผูกกับสัญลักษณ์ที่คุณสร้าง — เมื่อวิเคราะห์เจอสัญลักษณ์นั้นในแบบแปลน ระบบจะดึงชื่อ หน่วย และราคาต่อหน่วยมาสรุปให้อัตโนมัติ</div>
+  <div class="row" style="margin-top:10px;align-items:center;">
+    <button class="secondary" id="btnImportExcel">📥 เลือกไฟล์ Excel</button>
+    <input type="file" id="fileExcelImport" accept=".xlsx,.xls,.csv" style="display:none;">
+    <span class="status-line" id="priceDbStatus" style="margin:0;">ยังไม่ได้นำเข้าฐานข้อมูลราคา</span>
+    <button class="danger" id="btnClearPriceDb" style="display:none;">🗑 ล้างฐานข้อมูลราคา</button>
   </div>
 
-  <div id="pinPanel">
-    <button class="btn secondary" id="addPinBtn">➕ เพิ่มหมุดตำหนิ (กดแล้วแตะจุดบนรูปองค์ครู)</button>
-    <div id="pinList"></div>
-    <div id="pinSummary"></div>
-  </div>
-
-  <button class="btn secondary" id="wsBackBtn" style="margin-top:14px">← กลับรายการองค์ครู</button>
-</div>
-
-<!-- ============ หน้าคู่มือการใช้งาน ============ -->
-<div class="page" id="pgHelp">
-  <div class="card helpcard" style="width:100%">
-    <h2>คู่มือการใช้งาน</h2>
-    <p class="sub">ส่องพระ AI — เครื่องมือคัดกรองเบื้องต้นด้วยภาพ ไม่ใช่เครื่องมือชี้ขาดแท้-เก๊</p>
-
-    <h3>1. เพิ่มรูปพระแท้เข้าฐานข้อมูล</h3>
-    <p>กด <b>"+ เพิ่มรูปพระแท้"</b> เลือกรูปได้ทีละหลายรูป (เลือกจาก Google Drive ได้ด้วย) ระบบจะถาม:</p>
-    <ol>
-      <li>ชื่อรุ่น/ชุด — ใช้แสดงในหน้าเทียบตำหนิ</li>
-      <li>ราคา — เว้นว่างได้ถ้ายังไม่รู้ ใส่ทีหลังได้</li>
-    </ol>
-    <p>รูปที่เพิ่มจะใช้ได้ทั้ง <b>ฐานส่องพระ</b> และ <b>หน้าเทียบตำหนิ</b> ในครั้งเดียว ไม่ต้องอัปโหลดซ้ำ</p>
-    <p><span class="tag">แตะรูปย่อ</span>ในหน้าหลักเพื่อแก้ราคาทีหลังได้ทุกเมื่อ</p>
-
-    <h3>2. วางรูปจากเว็บ (ไม่ต้องดาวน์โหลดก่อน)</h3>
-    <ol>
-      <li>เจอรูปพระแท้บนเว็บ → กดค้างที่รูป → เลือก <b>"คัดลอกรูปภาพ / Copy Image"</b></li>
-      <li>มาที่แอป → แตะกล่องเส้นประ <b>"แตะค้างตรงนี้..."</b></li>
-      <li>แตะค้างอีกครั้งในกล่อง → เลือก <b>"วาง / Paste"</b> จากเมนูที่เด้งขึ้น</li>
-    </ol>
-    <p>รูปจะถูกประมวลผลและเข้าระบบเหมือนเพิ่มไฟล์ปกติทุกอย่าง</p>
-
-    <h3>3. ส่องพระแบบเรียลไทม์</h3>
-    <p>กด <b>"เริ่มส่องพระ"</b> → อนุญาตใช้กล้อง → เอากล้องหลังส่ององค์พระให้เต็มกรอบ ระบบจะตัดพื้นหลังและครอปเฉพาะองค์พระให้อัตโนมัติก่อนเทียบเสมอ</p>
-    <ul>
-      <li><b>วงพิมพ์ทรง</b> — ความเหมือนรูปทรง/บล็อกกับรูปในฐานข้อมูลที่ใกล้เคียงที่สุด</li>
-      <li><b>วงโทนสีผิว</b> — ความเหมือนโทนสี (ไวต่อแสงมาก ควรส่องใต้แสงขาวสว่างสม่ำเสมอ)</li>
-      <li>เขียว = 70% ขึ้นไป, แดง = ต่ำกว่า 70%</li>
-      <li>แถบราคา — โชว์ราคาของรูปที่จับคู่ได้ เทียบกับ "เกณฑ์ราคา" ที่ตั้งไว้ในหน้าหลัก</li>
-      <li>แถบซูม — ใช้เมื่อองค์พระเล็กเกินไปในจอเท่านั้น ไม่จำเป็นต้องซูมให้พอดีเป๊ะ เพราะระบบครอปให้อัตโนมัติอยู่แล้ว</li>
-    </ul>
-    <p>เห็น % เข้าตา → กด <b>📸 เก็บภาพนี้ไว้เทียบตำหนิ</b> ระบบจะหาว่าตรงกับรูปในฐานข้อมูลรูปไหนที่สุด แล้วเปิดหน้าเทียบให้อัตโนมัติพร้อม %</p>
-
-    <h3>4. เทียบตำหนิแบบละเอียด</h3>
-    <p>เข้าได้จากปุ่ม <b>"🔍 เทียบตำหนิ"</b> ในหน้าหลัก แล้วแตะรูปที่ต้องการ หรือมาจากการกด 📸 ในหน้าส่อง มี 3 โหมด:</p>
-    <ul>
-      <li><b>เทียบคู่</b> — สองภาพเคียงกัน ลากนิ้วเลื่อนดู เลื่อน/ซูมพร้อมกันเสมอ</li>
-      <li><b>ภาพซ้อน</b> — ซ้อนสองภาพทับกัน เลื่อนแถบความเข้มดูว่าเส้นพิมพ์ตรงกันไหม</li>
-      <li><b>หมุดตำหนิ</b> — กด "➕ เพิ่มหมุดตำหนิ" แล้วแตะจุดบนรูปองค์ครู ตั้งชื่อจุด จากนั้นเช็คทีละจุดว่า "ตรง/ไม่ตรง" ได้</li>
-    </ul>
-    <p><b>ในแท็บ "เทียบคู่"</b> คลิก/แตะจุดที่สงสัยบนรูปฝั่งไหนก็ได้ครั้งเดียว ระบบจะซูมเฉพาะจุดนั้นของทั้งสองภาพ ปรับความสว่าง/โทนสีและสเกลขนาดให้ใกล้เคียงกันก่อนอัตโนมัติ แล้วคำนวณ <b>% ความใกล้เคียงเฉพาะจุด</b> ให้ทันที (ในแท็บ "หมุดตำหนิ" ต้องกดค้างแทน เพราะคลิกเดียวถูกใช้สำหรับปักหมุด)</p>
-    <p>อยากเน้นตำแหน่งตำหนิให้ชัดกว่าจุดเดียว กด <b>"🎯 วาดวงกลมเน้นตำหนิ"</b> แล้วลากบนรูปฝั่งไหนก็ได้จากจุดศูนย์กลางออกไปเป็นวงกลม ระบบจะวาดวงเดียวกันซ้อนบนทั้งสองภาพให้อัตโนมัติ พร้อมคำนวณ % เฉพาะพื้นที่ในวงนั้น วงจะเปลี่ยนเป็นสีเขียว/แดงตามผล กด "✕ ล้างวง" เพื่อลบแล้ววงใหม่ได้</p>
-    <p>ไม่มีรูปองค์ที่ตรวจสอบ? กด <b>"เลือกรูปองค์ที่ตรวจสอบ"</b> อัปโหลดรูปที่ถ่ายด้วยกล้องปกติ หรือรูปที่แคปหน้าจอมาได้เลย</p>
-
-    <h3>5. เกณฑ์ราคาและสี</h3>
-    <p>ตั้ง <b>"เกณฑ์ราคา"</b> ในหน้าหลัก — ตอนส่อง ถ้าราคาของรูปที่จับคู่ได้ไม่เกินเกณฑ์ = ตัวเลขสีเขียว เกินเกณฑ์ = สีแดง</p>
-
-    <h3>6. สำรอง / กู้คืนข้อมูล</h3>
-    <p>กด <b>"⬇ สำรองฐานข้อมูลเป็นไฟล์"</b> เป็นระยะ โดยเฉพาะหลังเพิ่มรูปชุดใหญ่ แล้วเก็บไฟล์ที่ได้ไว้ใน Google Drive ถ้าเปลี่ยนเครื่องหรือข้อมูลหาย กด <b>"⬆ กู้คืนจากไฟล์สำรอง"</b> เลือกไฟล์นั้น ข้อมูลกลับมาครบทันที (รวมราคาและหมุดตำหนิ)</p>
-
-    <h3>7. ส่องจากหน้าจอคอม (เฉพาะคอมพิวเตอร์)</h3>
-    <p>ถ้าเปิดจากคอมด้วย Chrome/Edge/Firefox จะเห็นปุ่ม <b>"📺 ส่องจากหน้าจอคอม"</b> เพิ่มมา ใช้ตอนกำลังดูไลฟ์ขายพระอยู่ในแท็บ/หน้าต่างอื่น กดแล้วเลือกแท็บ/หน้าต่างนั้นให้แอปวิเคราะห์แบบเรียลไทม์ได้เลย (ปุ่มนี้จะไม่แสดงบนมือถือ เพราะมือถือส่วนใหญ่ไม่รองรับความสามารถนี้) โหมดนี้มีของเสริมเฉพาะ:</p>
-    <ul>
-      <li><b>ลากกรอบเลือกจุดวิเคราะห์เอง</b> — ลากเมาส์บนภาพเพื่อเลือกตำแหน่งองค์พระแม่นๆ (แทนการครอปกึ่งกลางอัตโนมัติ) มีประโยชน์เพราะจอไลฟ์มักมีของรก (แชท/ปุ่ม UI) ทำให้ตัดพื้นหลังอัตโนมัติพลาดง่ายกว่าปกติ กด "รีเซ็ตกรอบ" เพื่อกลับไปใช้ทั้งภาพ</li>
-      <li><b>เก็บภาพได้หลายรูป</b> — กด 📸 ได้เรื่อยๆ ระหว่างดูไลฟ์ (คนขายมักหมุนองค์ให้ดูหลายมุมเร็วๆ) ภาพจะสะสมเป็นแกลเลอรีด้านล่าง แตะรูปไหนก็ได้ทีหลังเพื่อส่งไปเทียบตำหนิ แตะ ✕ เพื่อลบรูปที่ไม่ต้องการ</li>
-      <li><b>คีย์ลัด Spacebar</b> — กด Spacebar แทนการคลิกปุ่ม 📸 ได้ สะดวกเวลาต้องจับจังหวะเร็วๆ</li>
-    </ul>
-
-    <h3>⚠️ ข้อควรระวัง</h3>
-    <ul>
-      <li>ตัวเลข % คือความเหมือนของภาพเท่านั้น ไม่ใช่การยืนยันแท้-เก๊ พระเก๊ถอดพิมพ์เหมือนอาจได้คะแนนสูงได้</li>
-      <li>ระบบไม่สามารถบอกความเก่าถึงยุคได้</li>
-      <li>ถ่ายบนพื้นหลังสีเรียบ (ผ้ากำมะหยี่/พื้นขาว) แสงสว่างสม่ำเสมอ จะได้ผลแม่นที่สุด</li>
-      <li>ใช้เป็นตัวคัดกรองเบื้องต้น พระราคาสูงควรให้ผู้ชำนาญตรวจสอบก่อนตัดสินใจเช่าบูชาทุกครั้ง</li>
-      <li>ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้เท่านั้น เปิดเครื่องอื่นจะเป็นฐานข้อมูลว่างใหม่ (ใช้ไฟล์สำรองย้ายข้อมูลได้)</li>
-    </ul>
-
-    <button class="btn secondary" id="helpBackBtn" style="margin-top:18px">← กลับหน้าหลัก</button>
+  <div id="importMapping" style="display:none;margin-top:14px;">
+    <div class="row">
+      <label style="flex:1;min-width:150px;">ชีต (Sheet)
+        <select id="sheetSelect"></select>
+      </label>
+      <label style="flex:1;min-width:100px;">แถวเริ่มต้นข้อมูล
+        <input type="number" id="startRow" value="1" min="1">
+      </label>
+    </div>
+    <div class="row">
+      <label style="flex:1;min-width:80px;">คอลัมน์รหัส <input type="text" id="colCode" placeholder="เช่น A" maxlength="2"></label>
+      <label style="flex:1;min-width:80px;">คอลัมน์รายละเอียด <input type="text" id="colName" placeholder="เช่น B" maxlength="2"></label>
+      <label style="flex:1;min-width:80px;">คอลัมน์หน่วย <input type="text" id="colUnit" placeholder="เช่น C" maxlength="2"></label>
+      <label style="flex:1;min-width:80px;">คอลัมน์ราคา/หน่วย <input type="text" id="colPrice" placeholder="เช่น D" maxlength="2"></label>
+    </div>
+    <div class="hint">ดูตัวอย่างข้อมูลด้านล่าง แล้วระบุว่าคอลัมน์ไหน (A, B, C, ...) ตรงกับอะไร — จะนำเข้าเฉพาะแถวที่มีข้อมูลในคอลัมน์ "รหัส" เท่านั้น</div>
+    <div id="previewTableWrap" style="overflow:auto;max-height:260px;margin-top:8px;border:1px solid var(--border);border-radius:8px;"></div>
+    <button id="btnConfirmImport" style="margin-top:10px;">✅ นำเข้าเป็นฐานข้อมูลราคา</button>
   </div>
 </div>
 
-<p id="status"></p>
+<!-- Symbol creation modal -->
+<div class="modal-overlay" id="symbolModalOverlay">
+  <div class="modal-box">
+    <h3>➕ เพิ่มสัญลักษณ์ใหม่</h3>
+    <img id="modalPreviewImg" src="">
+    <div class="row">
+      <button class="secondary tab-btn active" id="modalTabManual" style="flex:1;">✏️ กรอกเอง</button>
+      <button class="secondary tab-btn" id="modalTabLink" style="flex:1;">🔗 เลือกจากตารางราคา</button>
+    </div>
+    <div id="modalManualSection" style="margin-top:10px;">
+      <label>รหัส/เลข <input type="text" id="modalCode" placeholder="เช่น 5.01"></label>
+      <label>ชื่ออุปกรณ์/รายการ <input type="text" id="modalName" placeholder="เช่น ท่อ HDPE 100 ชั้น PN 6 Dia 110 มม."></label>
+    </div>
+    <div id="modalLinkSection" style="display:none;margin-top:10px;">
+      <label>พิมพ์ชื่อ/รหัส (ไม่ต้องระบุขนาด ระบบจะโชว์ทุกขนาดให้เลือก) <input type="text" id="modalSearch" placeholder="เช่น HDPE 100 PN6"></label>
+      <div id="modalSearchResults" style="max-height:220px;overflow:auto;margin-top:6px;"></div>
+    </div>
+    <div class="row" style="margin-top:16px;">
+      <button id="modalSave" style="flex:1;">💾 บันทึก</button>
+      <button class="secondary" id="modalCancel" style="flex:1;">✖ ยกเลิก</button>
+    </div>
+  </div>
+</div>
 
-<p class="warn">ตัวเลขและการเทียบเป็นการเปรียบภาพกับฐานข้อมูลเท่านั้น พระเก๊ถอดพิมพ์เหมือนอาจได้คะแนนสูงได้<br>ระบบไม่สามารถยืนยันความเก่าถึงยุคได้ — ใช้คัดกรองเบื้องต้น ควรให้ผู้ชำนาญตรวจสอบก่อนเช่าบูชาทุกครั้ง</p>
+<!-- Screen-capture-to-symbol modal -->
+<div class="modal-overlay" id="captureModalOverlay">
+  <div class="modal-box" style="width:920px;max-width:96vw;">
+    <h3>📸 แคปหน้าจอเพื่อเพิ่มสัญลักษณ์</h3>
+    <div class="hint">1) กดแคปแล้วเลือกหน้าต่าง/หน้าจอที่มีสัญลักษณ์อยู่ &nbsp; 2) ซูมเข้าหาจุดที่ต้องการ &nbsp; 3) <b>กดค้างแล้วลากเมาส์บนภาพด้านล่างเพื่อวาดกรอบล้อมสัญลักษณ์เอง</b> (เหมือนเครื่องมือ Snipping Tool) &nbsp; 4) กด "บันทึก"</div>
+    <div class="row" style="margin-top:8px;align-items:center;">
+      <button class="secondary" id="btnZoomOut">➖ ซูมออก</button>
+      <span id="zoomLabel" style="align-self:center;font-size:12px;color:var(--muted);min-width:44px;text-align:center;">100%</span>
+      <button class="secondary" id="btnZoomIn">➕ ซูมเข้า</button>
+      <button class="secondary" id="btnZoomReset">↺ รีเซ็ตซูม</button>
+    </div>
+    <div style="background:rgba(79,140,255,.15);border:1px solid var(--accent);color:var(--accent);font-size:12px;font-weight:700;padding:8px 10px;border-radius:8px;margin-top:8px;text-align:center;">
+      🖱️ กดค้างแล้วลากเมาส์บนภาพด้านล่าง เพื่อวาดกรอบเลือกสัญลักษณ์ด้วยตัวเอง
+    </div>
+    <div id="captureStageWrap" style="position:relative;width:100%;max-height:520px;background:#000;border-radius:8px;overflow:auto;margin-top:8px;min-height:260px;display:flex;align-items:flex-start;justify-content:flex-start;">
+      <canvas id="captureCanvas"></canvas>
+      <canvas id="captureCropOverlay"></canvas>
+      <div class="empty" id="captureEmpty" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;">กำลังขอสิทธิ์แชร์หน้าจอ...</div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button class="secondary" id="btnRecapture">🔄 แคปใหม่</button>
+      <button id="btnSaveCaptureSymbol" disabled style="flex:1;">💾 บันทึกเป็นสัญลักษณ์ใหม่จากกรอบที่ลากไว้</button>
+      <button class="secondary" id="btnCloseCaptureModal">✖ ปิด</button>
+    </div>
+  </div>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-const CIRC = 245;
-const DB_KEY = 'phraRefDB_v1';
-const LIMIT_KEY = 'phraPriceLimit';
-const PROC_VER = 3;
-let net = null;
-let db = [];
-let masters = [];
-let stream = null, running = false;
-let zoom = 1;
-let screenMode = false;      // true เมื่อกำลังส่องจากหน้าจอคอม (ไม่ใช่กล้อง)
-let roi = null;              // กรอบที่ผู้ใช้ลากเลือกเอง {fx0,fy0,fw} สัดส่วน 0-1 หรือ null = ใช้ทั้งภาพ
-let capturedShots = [];      // คลังภาพที่เก็บระหว่างเซสชันส่องจากหน้าจอ [{id, thumb, crop}]
-let sessionSuspect = null;      // ภาพที่ถ่ายเก็บไว้จากหน้าส่อง (canvas)
-let sessionSuspectVec = null;   // เวกเตอร์พิมพ์ทรงของภาพที่ถ่ายเก็บไว้
-let suspectVec = null;          // เวกเตอร์ขององค์ที่กำลังตรวจสอบใน workspace
-let masterScores = {};          // id องค์ครู -> % ตรงกับองค์ที่ตรวจสอบ
-const W = 224;
-const work = document.createElement('canvas'); work.width = W; work.height = W;
-const wctx = work.getContext('2d', { willReadFrequently: true });
-
-/* ============ สลับหน้า ============ */
-function showPage(id){
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
-  $(id).classList.add('on');
-  $('homeBtn').classList.toggle('show', id !== 'pgSetup');
-}
-
-/* ============================================================
-   ตัดพื้นหลัง (จากขอบภาพ) — paint=true จะทาพื้นหลังเป็นเทาลงบน work
-   ============================================================ */
-function removeBackground(paint){
-  const imgData = wctx.getImageData(0, 0, W, W);
-  const d = imgData.data;
-  const TOL = 42;
-  const mask = new Uint8Array(W*W);
-  const queue = [];
-  function edgeAvg(pixels){
-    let r=0,g=0,b=0;
-    for (const p of pixels){ r+=d[p*4]; g+=d[p*4+1]; b+=d[p*4+2]; }
-    const n = pixels.length;
-    return [r/n, g/n, b/n];
-  }
-  const top=[], bot=[], lef=[], rig=[];
-  for (let i=0;i<W;i++){
-    top.push(i); bot.push((W-1)*W+i); lef.push(i*W); rig.push(i*W+W-1);
-  }
-  const refs = [edgeAvg(top), edgeAvg(bot), edgeAvg(lef), edgeAvg(rig)];
-  function isBg(p){
-    const r=d[p*4], g=d[p*4+1], b=d[p*4+2];
-    for (const c of refs){
-      if (Math.abs(r-c[0])+Math.abs(g-c[1])+Math.abs(b-c[2]) < TOL*3) return true;
-    }
-    return false;
-  }
-  for (const p of [...top,...bot,...lef,...rig]){
-    if (!mask[p] && isBg(p)){ mask[p]=1; queue.push(p); }
-  }
-  while (queue.length){
-    const p = queue.pop();
-    const x = p % W, y = (p-x)/W;
-    const nb = [];
-    if (x>0) nb.push(p-1);
-    if (x<W-1) nb.push(p+1);
-    if (y>0) nb.push(p-W);
-    if (y<W-1) nb.push(p+W);
-    for (const q of nb){
-      if (!mask[q] && isBg(q)){ mask[q]=1; queue.push(q); }
-    }
-  }
-  let cnt = 0;
-  for (let i=0;i<mask.length;i++) cnt += mask[i];
-  const frac = cnt / mask.length;
-  if (frac < 0.08 || frac > 0.90) return null;
-  if (paint){
-    for (let i=0;i<mask.length;i++){
-      if (mask[i]){ d[i*4]=120; d[i*4+1]=118; d[i*4+2]=112; }
-    }
-    wctx.putImageData(imgData, 0, 0);
-  }
-  return mask;
-}
-
-/* หากรอบพอดีองค์พระจาก mask (1=พื้นหลัง) */
-function getBBox(mask){
-  let minX=W, minY=W, maxX=-1, maxY=-1;
-  for (let y=0; y<W; y++){
-    const row = y*W;
-    for (let x=0; x<W; x++){
-      if (!mask[row+x]){
-        if (x<minX) minX=x; if (x>maxX) maxX=x;
-        if (y<minY) minY=y; if (y>maxY) maxY=y;
+/* ============ IndexedDB storage (private, local-only) ============ */
+const DB_NAME = 'blueprintSymbolDB', STORE = 'symbols', PRICE_STORE = 'priceList';
+let db;
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = e=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains(STORE)){
+        d.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});
       }
-    }
-  }
-  if (maxX < 0) return null;
-  const w = maxX-minX+1, h = maxY-minY+1;
-  if (w < W*0.15 || h < W*0.15) return null;
-  const mx = w*0.12, my = h*0.12;
-  const x0 = Math.max(0, minX-mx), y0 = Math.max(0, minY-my);
-  const x1 = Math.min(W, maxX+1+mx), y1 = Math.min(W, maxY+1+my);
-  if (x1-x0 < 2 || y1-y0 < 2) return null;
-  return { x:x0, y:y0, w:x1-x0, h:y1-y0 };
-}
-
-/* ============ วิเคราะห์เพื่อคะแนน (ใช้ mask+crop เหมือนเดิม) ============ */
-async function embed(source){
-  const t = tf.tidy(() => {
-    const e = net.infer(source, true);
-    return tf.div(e, tf.norm(e));
-  });
-  const arr = Array.from(await t.data()).map(x => Math.round(x*1000)/1000);
-  t.dispose();
-  return arr;
-}
-function cosine(a, b){
-  let s = 0;
-  for (let i = 0; i < a.length; i++) s += a[i]*b[i];
-  return s;
-}
-function shapeToPct(c){ return Math.max(0, Math.min(100, Math.round((c - 0.5) / 0.5 * 100))); }
-function colorToPct(c){ return Math.max(0, Math.min(100, Math.round(c * 100))); }
-
-function colorHist(mask){
-  const M = 16;
-  const dImg = wctx.getImageData(0, 0, W, W);
-  const d = dImg.data;
-  const bins = new Array(12*4*4).fill(0);
-  let n = 0;
-  for (let y = M; y < W-M; y += 2){
-    for (let x = M; x < W-M; x += 2){
-      const p = y*W + x;
-      if (mask && mask[p]) continue;
-      const i = p*4;
-      const r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
-      const mx = Math.max(r,g,b), mn = Math.min(r,g,b), df = mx-mn;
-      let h = 0;
-      if (df > 0){
-        if (mx === r) h = ((g-b)/df) % 6;
-        else if (mx === g) h = (b-r)/df + 2;
-        else h = (r-g)/df + 4;
-        h = (h*60+360) % 360;
+      if(!d.objectStoreNames.contains(PRICE_STORE)){
+        d.createObjectStore(PRICE_STORE,{keyPath:'id',autoIncrement:true});
       }
-      const s = mx === 0 ? 0 : df/mx;
-      bins[Math.min(11,Math.floor(h/30))*16 + Math.min(3,Math.floor(s*4))*4 + Math.min(3,Math.floor(mx*4))]++;
-      n++;
-    }
-  }
-  if (!n) return bins;
-  return bins.map(x => Math.round(x/n*1000)/1000);
+    };
+    req.onsuccess = e=>{ db=e.target.result; resolve(db); };
+    req.onerror = e=>reject(e);
+  });
 }
-function histSim(a, b){
-  let s = 0;
-  for (let i = 0; i < a.length; i++) s += Math.min(a[i], b[i]);
-  return s;
+function addSymbolToDB(sym){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).add(sym);
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = e=>reject(e);
+  });
 }
-
-async function analyzeImageSource(img){
-  wctx.drawImage(img, 0, 0, W, W);
-  let mask = removeBackground(true);
-  if (mask){
-    const box = getBBox(mask);
-    if (box && box.w*box.h < 0.85*W*W){
-      const sx = box.x/W*img.width, sy = box.y/W*img.height;
-      const sw = box.w/W*img.width, sh = box.h/W*img.height;
-      wctx.clearRect(0, 0, W, W);
-      wctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, W);
-      mask = removeBackground(true);
-    }
-  }
-  const v = await embed(work);
-  const h = colorHist(mask);
-  return { v, h };
+function getAllSymbolsFromDB(){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = e=>reject(e);
+  });
 }
-
-async function analyzeVideoFrame(video, baseX, baseY, s){
-  wctx.drawImage(video, baseX, baseY, s, s, 0, 0, W, W);
-  let mask = removeBackground(true);
-  if (mask){
-    const box = getBBox(mask);
-    if (box && box.w*box.h < 0.85*W*W){
-      const sx = baseX + box.x/W*s, sy = baseY + box.y/W*s;
-      const sw = box.w/W*s, sh = box.h/W*s;
-      wctx.clearRect(0, 0, W, W);
-      wctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, W);
-      mask = removeBackground(true);
-    }
-  }
-  $('seen').getContext('2d').drawImage(work, 0, 0);
-  const q = await embed(work);
-  const qh = colorHist(mask);
-  return { q, qh };
+function deleteSymbolFromDB(id){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = ()=>resolve();
+    req.onerror = e=>reject(e);
+  });
 }
-
-/* ============ ครอปเพื่อการ "เทียบด้วยตา" (คงสีจริง ไม่ทาเทา) ============
-   รับ source (img/canvas/video-region ที่วาดเป็น canvas แล้ว) คืน canvas ครอปพอดีองค์
-   บังคับใช้ผืนภาพขนาดคงที่ (COMPARE_SIZE) เท่ากันทุกรูปเสมอ เพื่อให้องค์พระถูกสเกล
-   ให้มีขนาดเทียบเท่ากันจริง ไม่ว่ารูปต้นฉบับจะความละเอียด/ระยะซูมต่างกันแค่ไหน */
-const COMPARE_SIZE = 900;
-function cropForCompare(source){
-  const sw0 = source.width || source.videoWidth;
-  const sh0 = source.height || source.videoHeight;
-  wctx.drawImage(source, 0, 0, W, W);
-  const mask = removeBackground(false);
-  let sx = 0, sy = 0, sw = sw0, sh = sh0;
-  if (mask){
-    const box = getBBox(mask);
-    if (box && box.w*box.h < 0.9*W*W){
-      sx = box.x/W*sw0; sy = box.y/W*sh0;
-      sw = box.w/W*sw0; sh = box.h/W*sh0;
-    }
-  }
-  const side = Math.max(sw, sh);
-  const out = document.createElement('canvas');
-  const S = COMPARE_SIZE;                 // ขนาดผืนภาพคงที่ เท่ากันทุกรูปเสมอ
-  out.width = S; out.height = S;
-  const octx = out.getContext('2d');
-  octx.fillStyle = '#1A1206'; octx.fillRect(0, 0, S, S);
-  // สเกลให้ "ด้านยาวสุดขององค์พระ" เท่ากับ S พอดีทุกรูป = ขนาดองค์พระเทียบเท่ากันจริง
-  const scale = S / side;
-  const dw = sw*scale, dh = sh*scale;
-  octx.drawImage(source, sx, sy, sw, sh, (S-dw)/2, (S-dh)/2, dw, dh);
-  return out;
+function addPriceRowsBulk(rows){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(PRICE_STORE,'readwrite');
+    const store = tx.objectStore(PRICE_STORE);
+    rows.forEach(r=>store.add(r));
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = e=>reject(e);
+  });
 }
-
-/* ============ ฐานข้อมูลส่องพระ (localStorage) ============ */
-async function loadDB(){
-  try { db = JSON.parse(localStorage.getItem(DB_KEY)) || []; } catch(e){ db = []; }
-  renderDB();
-  const needs = db.filter(r => r.p !== PROC_VER);
-  if (needs.length){
-    await ensureNet();
-    let done = 0;
-    for (const r of needs){
-      try {
-        const img = await srcToImage(r.img);
-        const { v, h } = await analyzeImageSource(img);
-        r.v = v; r.h = h; r.p = PROC_VER;
-      } catch(e){}
-      done++;
-      $('status').textContent = `กำลังอัปเดตฐานข้อมูล ${done}/${needs.length}…`;
-    }
-    saveDB();
-    $('status').textContent = 'อัปเดตฐานข้อมูลเรียบร้อย';
-  }
-  // รูปเดิมที่ยังไม่มีในหน้าเทียบตำหนิ → สร้างให้อัตโนมัติจากรูปที่เก็บไว้ (ไม่ต้องอัปโหลดใหม่)
-  const mIds = new Set(masters.map(m => m.id));
-  const orphan = db.filter(r => !r.mid || !mIds.has(r.mid));
-  if (orphan.length){
-    let i = 0;
-    for (const r of orphan){
-      i++;
-      const m = {
-        id: Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2,5),
-        name: 'รูปเดิม #' + i,
-        img: r.img, v: r.v, pins: [], created: Date.now(), lowRes: true
-      };
-      if (typeof r.price === 'number') m.price = r.price;
-      if (await idbPut(m)){ masters.push(m); r.mid = m.id; }
-    }
-    saveDB(); renderMasters();
-  }
+function getAllPriceRowsFromDB(){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(PRICE_STORE,'readonly');
+    const req = tx.objectStore(PRICE_STORE).getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = e=>reject(e);
+  });
 }
-function saveDB(){
-  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); return true; }
-  catch(e){
-    $('status').textContent = 'พื้นที่เก็บข้อมูลเต็ม — รูปชุดล่าสุดจะใช้ได้เฉพาะรอบนี้';
-    return false;
-  }
-}
-function renderDB(){
-  $('count').textContent = db.length;
-  $('goBtn').disabled = db.length === 0;
-  $('clearBtn').style.display = db.length ? 'block' : 'none';
-  $('backupBtn').style.display = (db.length || masters.length) ? 'block' : 'none';
-  const t = $('thumbs'); t.innerHTML = '';
-  db.slice(-30).reverse().forEach(r => {
-    const box = document.createElement('div');
-    box.className = 'th';
-    const im = new Image(); im.src = r.img;
-    box.appendChild(im);
-    const pb = document.createElement('span');
-    pb.className = 'pb';
-    pb.textContent = (typeof r.price === 'number') ? r.price.toLocaleString('th-TH') + '฿' : 'ไม่มีราคา';
-    box.appendChild(pb);
-    box.addEventListener('click', async () => {
-      const cur = (typeof r.price === 'number') ? String(r.price) : '';
-      const ans = await askText('ราคา (บาท) ของรูปนี้ — เว้นว่างแล้วกดตกลง = ลบราคา', cur);
-      if (ans === null) return;
-      const num = parseFloat(String(ans).replace(/[, ]/g,''));
-      if (ans.trim() === ''){ delete r.price; }
-      else if (isFinite(num) && num >= 0){ r.price = num; }
-      else { $('status').textContent = 'ราคาต้องเป็นตัวเลขเท่านั้น'; return; }
-      saveDB(); renderDB();
-    });
-    t.appendChild(box);
+function clearPriceListDB(){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(PRICE_STORE,'readwrite');
+    tx.objectStore(PRICE_STORE).clear();
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = e=>reject(e);
   });
 }
 
-/* ============ คลังองค์ครู (IndexedDB — จุรูปความละเอียดเต็มได้) ============ */
-let idb = null;
-function openIDB(){
-  return new Promise((res) => {
-    try {
-      const r = indexedDB.open('songphra', 1);
-      r.onupgradeneeded = e => e.target.result.createObjectStore('masters', { keyPath: 'id' });
-      r.onsuccess = e => { idb = e.target.result; res(); };
-      r.onerror = () => { idb = null; res(); };
-    } catch(e){ idb = null; res(); }
-  });
-}
-function idbAll(){
-  return new Promise((res) => {
-    if (!idb) return res([]);
-    try {
-      const tx = idb.transaction('masters', 'readonly').objectStore('masters').getAll();
-      tx.onsuccess = () => res(tx.result || []);
-      tx.onerror = () => res([]);
-    } catch(e){ res([]); }
-  });
-}
-function idbPut(m){
-  return new Promise((res) => {
-    if (!idb) return res(false);
-    try {
-      const tx = idb.transaction('masters', 'readwrite').objectStore('masters').put(m);
-      tx.onsuccess = () => res(true);
-      tx.onerror = () => res(false);
-    } catch(e){ res(false); }
-  });
-}
-function idbDel(id){
-  return new Promise((res) => {
-    if (!idb) return res(false);
-    try {
-      const tx = idb.transaction('masters', 'readwrite').objectStore('masters').delete(id);
-      tx.onsuccess = () => res(true);
-      tx.onerror = () => res(false);
-    } catch(e){ res(false); }
-  });
-}
-async function loadMasters(){
-  masters = await idbAll();
-  masters.sort((a,b) => (a.created||0) - (b.created||0));
-  renderMasters();
-}
-function renderMasters(){
-  $('mcount').textContent = masters.length;
-  const g = $('masterGrid'); g.innerHTML = '';
-  const arr = [...masters];
-  const hasScores = Object.keys(masterScores).length > 0;
-  if (hasScores){
-    arr.sort((a,b) => ((masterScores[b.id] ?? -1) - (masterScores[a.id] ?? -1)));
-  }
-  arr.forEach(m => {
-    const c = document.createElement('div');
-    c.className = 'mcard';
-    const sc = masterScores[m.id];
-    const badge = (sc != null)
-      ? `<small style="color:${sc>=70?'var(--high)':'var(--low)'};font-weight:700">ตรงกับองค์ที่ตรวจ ${sc}%</small>`
-      : '';
-    const lr = m.lowRes ? `<small style="color:var(--low)">(รูปย่อ — ซูมได้จำกัด)</small>` : '';
-    c.innerHTML = `<img src="${m.img}"><div class="mn">${escapeHtml(m.name)}<small>${(m.pins||[]).length} หมุดตำหนิ</small>${lr}${badge}</div>`;
-    c.addEventListener('click', () => openWorkspace(m));
-    g.appendChild(c);
-  });
-  renderDB(); // อัปเดตปุ่มสำรอง
-}
-function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/* ============ App state ============ */
+let symbols = []; // {id, code, name, unit, price, dataURL, w, h, color}
+let priceList = []; // {id, code, name, unit, price}
+let lastCounts = null;
+let stream = null;
+let continuousTimer = null;
+let cropMode = false, cropStart=null, cropRect=null;
 
-/* หมายเหตุ: รายการเทียบตำหนิสร้างจากรูปพระแท้ในหน้าหลักโดยอัตโนมัติ ไม่มีการอัปโหลดแยก */
+const video = document.getElementById('video');
+const stage = document.getElementById('stage');
+const overlay = document.getElementById('overlay');
+const cropOverlay = document.getElementById('cropOverlay');
+const stageEmpty = document.getElementById('stageEmpty');
+const stageStatus = document.getElementById('stageStatus');
+const libraryList = document.getElementById('libraryList');
 
-/* ============ กล่องกรอกข้อความของแอปเอง (แทน prompt() ของเบราว์เซอร์) ============
-   ข้อดี: เป็นแค่ส่วนหนึ่งของหน้าเว็บ ไม่ใช่กล่องบล็อกทั้งจอ สลับแท็บ/แอปไปคัดลอก
-   ข้อความจากที่อื่นแล้วกลับมาวางต่อได้ ไม่หายเหมือน prompt() แบบเดิม */
-let modalResolve = null;
-function askText(title, defaultValue){
-  return new Promise(resolve => {
-    modalResolve = resolve;
-    $('modalTitle').textContent = title;
-    $('modalInput').value = defaultValue || '';
-    $('modalOverlay').classList.add('show');
-    setTimeout(() => { $('modalInput').focus(); $('modalInput').select(); }, 50);
-  });
-}
-function closeModal(result){
-  $('modalOverlay').classList.remove('show');
-  const r = modalResolve; modalResolve = null;
-  if (r) r(result);
-}
-$('modalOkBtn').addEventListener('click', () => closeModal($('modalInput').value));
-$('modalCancelBtn').addEventListener('click', () => closeModal(null));
-$('modalInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter'){ e.preventDefault(); closeModal($('modalInput').value); }
-  if (e.key === 'Escape'){ e.preventDefault(); closeModal(null); }
-});
-$('modalOverlay').addEventListener('click', e => { if (e.target.id === 'modalOverlay') closeModal(null); });
+const COLORS = ['#ff5c7a','#4f8cff','#3ddc97','#ffb64f','#7c5cff','#ff8ac8','#5ce1e6','#c4ff5c'];
 
-/* ============ โหลดโมเดล ============ */
-async function ensureNet(){
-  if (net) return;
-  $('status').textContent = 'กำลังโหลดระบบวิเคราะห์ภาพ (ครั้งแรกอาจใช้เวลาสักครู่)…';
-  net = await mobilenet.load({version: 2, alpha: 1.0});
-  $('status').textContent = '';
-}
+function randomColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+function fmtMoney(n){ return (n===null||n===undefined||n==='') ? '-' : Number(n).toLocaleString('th-TH',{maximumFractionDigits:2}); }
 
-/* ============ เพิ่มรูปพระแท้ (ฐานส่อง) ============ */
-$('addBtn').addEventListener('click', () => $('fileInput').click());
-/* ประมวลผลและบันทึกรูปพระแท้ 1 รูป (ใช้ร่วมกันทั้งเพิ่มจากไฟล์และวางจากคลิปบอร์ด) */
-async function ingestImage(img, name, price){
-  const th = document.createElement('canvas'); th.width = 96; th.height = 96;
-  th.getContext('2d').drawImage(img, 0, 0, 96, 96);
-  const { v, h } = await analyzeImageSource(img);
-  const rec = { v, h, img: th.toDataURL('image/jpeg', 0.7), p: PROC_VER };
-  if (price !== null && price !== undefined) rec.price = price;
-  const mxd = Math.max(img.width, img.height);
-  const sc = mxd > 1200 ? 1200/mxd : 1;
-  const full = document.createElement('canvas');
-  full.width = Math.round(img.width*sc); full.height = Math.round(img.height*sc);
-  full.getContext('2d').drawImage(img, 0, 0, full.width, full.height);
-  const m = {
-    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-    name, img: full.toDataURL('image/jpeg', 0.88),
-    v, pins: [], created: Date.now()
-  };
-  if (price !== null && price !== undefined) m.price = price;
-  if (await idbPut(m)){ masters.push(m); rec.mid = m.id; }
-  db.push(rec);
-}
-async function askPrice(msg){
-  const ans = await askText(msg, '');
-  if (ans === null || ans.trim() === '') return null;
-  const num = parseFloat(String(ans).replace(/[, ]/g,''));
-  return (isFinite(num) && num >= 0) ? num : null;
-}
-
-$('fileInput').addEventListener('change', async e => {
-  const files = [...e.target.files];
-  if (!files.length) return;
-  const nameAns = await askText(`ตั้งชื่อรุ่น/ชุดของรูป ${files.length} รูปนี้ (ใช้แสดงในหน้าเทียบตำหนิ)`, files[0].name.replace(/\.[^.]+$/,''));
-  const batchName = (nameAns && nameAns.trim()) ? nameAns.trim() : 'พระแท้';
-  const batchPrice = await askPrice(`ราคา (บาท) ของพระในรูปชุดนี้\nใส่ตัวเลขอย่างเดียว เช่น 10000\nเว้นว่างถ้ายังไม่ระบุ (มาแตะรูปใส่ทีหลังได้)`);
-  $('addBtn').disabled = true;
-  await ensureNet();
-  let done = 0;
-  for (const f of files){
-    try {
-      const img = await fileToImage(f);
-      const nm = files.length > 1 ? `${batchName} #${done+1}` : batchName;
-      await ingestImage(img, nm, batchPrice);
-    } catch(err){}
-    done++;
-    $('status').textContent = `กำลังประมวลผลรูป ${done}/${files.length}…`;
-  }
-  saveDB(); renderDB(); renderMasters();
-  $('status').textContent = `เพิ่มรูปเรียบร้อย ${db.length} รูป — พร้อมใช้ทั้งส่องและเทียบตำหนิ`;
-  $('addBtn').disabled = false;
-  e.target.value = '';
-});
-
-/* 📋 วางรูปที่คัดลอกจากเว็บ — ใช้ paste event บนกล่อง contenteditable
-   (เสถียรกว่า clipboard.read() มากบน Safari/Chrome มือถือ) */
-$('pasteZone').addEventListener('paste', async (e) => {
-  e.preventDefault();
-  const cd = e.clipboardData || window.clipboardData;
-  let blob = null;
-  if (cd && cd.items){
-    for (const item of cd.items){
-      if (item.type && item.type.indexOf('image') !== -1){ blob = item.getAsFile(); break; }
-    }
-  }
-  if (!blob && cd && cd.files && cd.files.length){
-    for (const f of cd.files){ if (f.type.indexOf('image') !== -1){ blob = f; break; } }
-  }
-  $('pasteZone').innerHTML = '';
-  if (!blob){
-    $('status').textContent = 'ไม่พบรูปในคลิปบอร์ด — ต้องกดค้างที่รูปบนเว็บแล้วเลือก "คัดลอกรูปภาพ / Copy Image" (ไม่ใช่คัดลอกลิงก์) ก่อนมาวาง';
+/* ============ Library UI ============ */
+async function refreshLibraryUI(){
+  symbols = await getAllSymbolsFromDB();
+  if(symbols.length===0){
+    libraryList.innerHTML = '<div class="empty">ยังไม่มีสัญลักษณ์ในฐานข้อมูล</div>';
     return;
   }
-  try {
-    const img = await fileToImage(blob);
-    const nameAns = await askText('ตั้งชื่อรุ่นของรูปนี้ (ใช้แสดงในหน้าเทียบตำหนิ)', 'พระแท้จากเว็บ');
-    if (nameAns === null) return;
-    const name = nameAns.trim() || 'พระแท้จากเว็บ';
-    const price = await askPrice('ราคา (บาท) ถ้ามี — เว้นว่างถ้ายังไม่ระบุ');
-    $('status').textContent = 'กำลังประมวลผลรูป…';
-    await ensureNet();
-    await ingestImage(img, name, price);
-    saveDB(); renderDB(); renderMasters();
-    $('status').textContent = `เพิ่มรูป "${name}" จากคลิปบอร์ดเรียบร้อย — รวมทั้งหมด ${db.length} รูป`;
-  } catch(err){
-    $('status').textContent = 'ประมวลผลรูปไม่สำเร็จ — ลองบันทึกรูปลงเครื่องแล้วกด + เพิ่มรูปพระแท้แทน';
-  }
-});
-/* กันไม่ให้พิมพ์ข้อความเข้ากล่องนี้โดยไม่ตั้งใจ (ไว้รับแค่การวางรูปเท่านั้น)
-   แต่ต้องไม่บล็อกปุ่มลัดวาง Ctrl+V / Cmd+V เอง! */
-$('pasteZone').addEventListener('keydown', e => {
-  const isPasteShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v';
-  if (!isPasteShortcut) e.preventDefault();
-});
-function fileToImage(file){
-  return new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = rej;
-    img.src = URL.createObjectURL(file);
+  libraryList.innerHTML = '';
+  symbols.forEach(sym=>{
+    const div = document.createElement('div');
+    div.className = 'symbol-item';
+    const priceLine = (sym.unit || sym.price!=null) ? `<div class="name">${sym.unit||''}${sym.price!=null?' · ฿'+fmtMoney(sym.price):''}</div>` : '';
+    div.innerHTML = `
+      <img src="${sym.dataURL}">
+      <div class="symbol-info">
+        <div class="code" style="color:${sym.color}">${sym.code}</div>
+        <div class="name">${sym.name}</div>
+        ${priceLine}
+      </div>
+      <span class="count-badge" id="badge-${sym.id}">0</span>
+      <button class="danger" style="padding:5px 8px;font-size:11px;" data-id="${sym.id}">ลบ</button>
+    `;
+    div.querySelector('button.danger').onclick = async ()=>{
+      if(confirm('ลบสัญลักษณ์นี้ออกจากฐานข้อมูล?')){
+        await deleteSymbolFromDB(sym.id);
+        refreshLibraryUI();
+      }
+    };
+    libraryList.appendChild(div);
   });
 }
-function srcToImage(src){
-  return new Promise((res, rej) => {
+
+/* ============ Symbol creation modal (manual entry OR linked to price list) ============ */
+const symbolModalOverlay = document.getElementById('symbolModalOverlay');
+let modalSelectedPriceRow = null, modalResolve = null;
+
+function openSymbolModal(dataURL, w, h){
+  return new Promise(resolve=>{
+    modalResolve = resolve;
+    modalSelectedPriceRow = null;
+    document.getElementById('modalPreviewImg').src = dataURL;
+    document.getElementById('modalCode').value = '';
+    document.getElementById('modalName').value = '';
+    document.getElementById('modalSearch').value = '';
+    document.getElementById('modalSearchResults').innerHTML = '';
+    const defaultTab = priceList.length>0 ? 'link' : 'manual';
+    switchModalTab(defaultTab);
+    symbolModalOverlay.dataset.w = w;
+    symbolModalOverlay.dataset.h = h;
+    symbolModalOverlay.dataset.dataURL = dataURL;
+    symbolModalOverlay.style.display = 'flex';
+    if(defaultTab==='link'){
+      setTimeout(()=>document.getElementById('modalSearch').focus(), 60);
+    }
+  });
+}
+function switchModalTab(tab){
+  document.getElementById('modalManualSection').style.display = tab==='manual' ? 'block' : 'none';
+  document.getElementById('modalLinkSection').style.display = tab==='link' ? 'block' : 'none';
+  document.getElementById('modalTabManual').classList.toggle('active', tab==='manual');
+  document.getElementById('modalTabLink').classList.toggle('active', tab==='link');
+  symbolModalOverlay.dataset.mode = tab;
+  if(tab==='link') renderPriceSearch(document.getElementById('modalSearch').value);
+}
+document.getElementById('modalTabManual').onclick = ()=>switchModalTab('manual');
+document.getElementById('modalTabLink').onclick = ()=>switchModalTab('link');
+document.getElementById('modalSearch').oninput = (e)=>renderPriceSearch(e.target.value);
+
+function renderPriceSearch(q){
+  q = (q||'').trim().toLowerCase();
+  const container = document.getElementById('modalSearchResults');
+  if(priceList.length===0){
+    container.innerHTML = '<div class="empty">ยังไม่ได้นำเข้าตารางราคา — เลื่อนลงไปที่ "ฐานข้อมูลราคา/รหัส" ด้านล่างของหน้าก่อน</div>';
+    return;
+  }
+  const results = priceList.filter(r=> !q || r.code.toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q)).slice(0,60);
+  container.innerHTML = results.map(r=>`
+    <div class="price-row" data-id="${r.id}">
+      <b style="color:var(--accent)">${r.code}</b> ${r.name||''}
+      <div style="color:var(--muted);">${r.unit||''}${r.price!=null?' · ฿'+fmtMoney(r.price):''}</div>
+    </div>`).join('') || '<div class="empty">ไม่พบรายการที่ตรงกับคำค้นหา</div>';
+  container.querySelectorAll('.price-row').forEach(el=>{
+    el.onclick = ()=>{
+      const id = parseInt(el.dataset.id);
+      modalSelectedPriceRow = priceList.find(r=>r.id===id);
+      container.querySelectorAll('.price-row').forEach(x=>x.style.background='');
+      el.style.background = 'rgba(79,140,255,.22)';
+    };
+  });
+}
+
+document.getElementById('modalSave').onclick = ()=>{
+  const dataURL = symbolModalOverlay.dataset.dataURL, w = +symbolModalOverlay.dataset.w, h = +symbolModalOverlay.dataset.h;
+  let sym;
+  if(symbolModalOverlay.dataset.mode==='link'){
+    if(!modalSelectedPriceRow){ alert('กรุณาเลือกรายการจากตารางราคาก่อน หรือสลับไปแท็บ "กรอกเอง"'); return; }
+    sym = { code: modalSelectedPriceRow.code, name: modalSelectedPriceRow.name, unit: modalSelectedPriceRow.unit, price: modalSelectedPriceRow.price, dataURL, w, h, color: randomColor() };
+  } else {
+    const code = document.getElementById('modalCode').value.trim();
+    const name = document.getElementById('modalName').value.trim();
+    if(!code){ alert('กรุณาระบุรหัส/เลขของสัญลักษณ์'); return; }
+    sym = { code, name, unit:'', price:null, dataURL, w, h, color: randomColor() };
+  }
+  symbolModalOverlay.style.display = 'none';
+  if(modalResolve) modalResolve(sym);
+};
+document.getElementById('modalCancel').onclick = ()=>{
+  symbolModalOverlay.style.display = 'none';
+  if(modalResolve) modalResolve(null);
+};
+
+async function addSymbolFromDataURL(dataURL, w, h){
+  const sym = await openSymbolModal(dataURL, w, h);
+  if(!sym) return;
+  await addSymbolToDB(sym);
+  refreshLibraryUI();
+}
+
+document.getElementById('btnUploadSymbol').onclick = ()=>{
+  document.getElementById('fileSymbolUpload').click();
+};
+document.getElementById('fileSymbolUpload').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
     const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = rej;
+    img.onload = ()=> addSymbolFromDataURL(ev.target.result, img.width, img.height);
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+};
+
+/* ============ Stage: screen share / upload plan ============ */
+function showStageCanvas(){
+  stageEmpty.style.display = 'none';
+  document.getElementById('btnAnalyze').disabled = !cvReady;
+  document.getElementById('btnStartCrop').style.display = 'inline-block';
+  const idBtn = document.getElementById('btnToggleIdentify');
+  idBtn.style.display = 'inline-block';
+  idBtn.disabled = !cvReady;
+}
+
+function fitCanvasesToStage(w,h){
+  [stage, overlay, cropOverlay].forEach(c=>{ c.width=w; c.height=h; });
+  overlay.style.width = stage.style.width = cropOverlay.style.width = w+'px';
+}
+
+async function startScreenShare(){
+  try{
+    stream = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'never'}, audio:false});
+    video.srcObject = stream;
+    await video.play();
+    fitCanvasesToStage(video.videoWidth, video.videoHeight);
+    drawVideoFrameToStage();
+    showStageCanvas();
+    stageStatus.textContent = 'กำลังแชร์หน้าจอสด — กด "จับภาพเฟรมปัจจุบัน" หรือเปิดโหมดวิเคราะห์ต่อเนื่อง';
+    document.getElementById('btnCaptureFrame').disabled = false;
+    document.getElementById('continuousToggle').disabled = false;
+    stream.getVideoTracks()[0].addEventListener('ended', stopScreenShare);
+  }catch(err){
+    alert('ไม่สามารถแชร์หน้าจอได้: '+err.message);
+  }
+}
+function stopScreenShare(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  document.getElementById('btnCaptureFrame').disabled = true;
+  document.getElementById('continuousToggle').checked = false;
+  document.getElementById('continuousToggle').disabled = true;
+  stopContinuous();
+  stageStatus.textContent = 'หยุดการแชร์หน้าจอแล้ว';
+}
+function drawVideoFrameToStage(){
+  const ctx = stage.getContext('2d');
+  ctx.drawImage(video,0,0,stage.width,stage.height);
+}
+
+document.getElementById('btnShareScreen').onclick = startScreenShare;
+document.getElementById('btnCaptureFrame').onclick = ()=>{
+  drawVideoFrameToStage();
+  clearOverlay();
+  stageStatus.textContent = 'จับภาพเฟรมแล้ว — พร้อมวิเคราะห์';
+};
+
+document.getElementById('btnUploadPlan').onclick = ()=> document.getElementById('fileplanUpload').click();
+document.getElementById('fileplanUpload').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const img = new Image();
+    img.onload = ()=>{
+      fitCanvasesToStage(img.width, img.height);
+      stage.getContext('2d').drawImage(img,0,0);
+      clearOverlay();
+      showStageCanvas();
+      stageStatus.textContent = 'โหลดภาพแบบแปลนแล้ว — พร้อมวิเคราะห์';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+};
+
+/* ============ Interaction mode: 'none' | 'crop' | 'identify' ============ */
+let interactionMode = 'none';
+const identifyTooltip = document.getElementById('identifyTooltip');
+
+/* ---- Crop mode: select region to save as new symbol ---- */
+document.getElementById('btnStartCrop').onclick = ()=>{
+  if(interactionMode==='identify'){ document.getElementById('btnToggleIdentify').click(); }
+  interactionMode = 'crop';
+  cropMode = true;
+  document.getElementById('cropHint').style.display='block';
+  cropOverlay.style.pointerEvents='auto';
+  cropOverlay.style.cursor='crosshair';
+};
+document.getElementById('btnCancelCrop').onclick = ()=>{
+  interactionMode = 'none';
+  cropMode = false; cropRect=null;
+  document.getElementById('cropHint').style.display='none';
+  document.getElementById('btnSaveCrop').disabled = true;
+  cropOverlay.style.pointerEvents='none';
+  cropOverlay.getContext('2d').clearRect(0,0,cropOverlay.width,cropOverlay.height);
+};
+cropOverlay.addEventListener('mousedown', e=>{
+  if(interactionMode!=='crop') return;
+  const rect = cropOverlay.getBoundingClientRect();
+  const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
+  cropStart = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+});
+cropOverlay.addEventListener('mousemove', e=>{
+  if(interactionMode==='crop'){
+    if(!cropStart) return;
+    const rect = cropOverlay.getBoundingClientRect();
+    const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
+    const cur = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+    cropRect = { x:Math.min(cropStart.x,cur.x), y:Math.min(cropStart.y,cur.y), w:Math.abs(cur.x-cropStart.x), h:Math.abs(cur.y-cropStart.y) };
+    const ctx = cropOverlay.getContext('2d');
+    ctx.clearRect(0,0,cropOverlay.width,cropOverlay.height);
+    ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 2;
+    ctx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+  } else if(interactionMode==='identify'){
+    scheduleIdentify(e);
+  }
+});
+cropOverlay.addEventListener('mouseup', ()=>{
+  if(interactionMode!=='crop') return;
+  cropStart = null;
+  document.getElementById('btnSaveCrop').disabled = !(cropRect && cropRect.w>3 && cropRect.h>3);
+});
+cropOverlay.addEventListener('mouseleave', ()=>{
+  identifyTooltip.style.display='none';
+});
+
+/* ---- Identify mode: hover to see what a symbol is, in real time ---- */
+document.getElementById('btnToggleIdentify').onclick = ()=>{
+  const btn = document.getElementById('btnToggleIdentify');
+  const hint = document.getElementById('identifyHint');
+  if(interactionMode==='identify'){
+    interactionMode = 'none';
+    cropOverlay.style.pointerEvents='none';
+    btn.textContent = '🎯 เปิดโหมดชี้ระบุสัญลักษณ์แบบเรียลไทม์';
+    btn.classList.remove('danger');
+    hint.style.display='none';
+    identifyTooltip.style.display='none';
+  } else {
+    if(interactionMode==='crop'){ document.getElementById('btnCancelCrop').click(); }
+    if(symbols.length===0){ alert('กรุณาเพิ่มสัญลักษณ์ในฐานข้อมูลก่อน ระบบถึงจะมีอะไรให้เทียบ'); return; }
+    interactionMode = 'identify';
+    cropOverlay.style.pointerEvents='auto';
+    cropOverlay.style.cursor='cell';
+    btn.textContent = '✖ ปิดโหมดชี้ระบุสัญลักษณ์';
+    btn.classList.add('danger');
+    hint.style.display='block';
+  }
+};
+
+let identifyBusy = false;
+function scheduleIdentify(e){
+  if(identifyBusy || !cvReady) return;
+  identifyBusy = true;
+  const rect = cropOverlay.getBoundingClientRect();
+  const scaleX = cropOverlay.width/rect.width, scaleY = cropOverlay.height/rect.height;
+  const px = (e.clientX-rect.left)*scaleX, py = (e.clientY-rect.top)*scaleY;
+  const tipLeft = (e.clientX-rect.left+16);
+  const tipTop = (e.clientY-rect.top+16);
+  identifyAt(px,py).then(({bestSym,bestScore})=>{
+    const threshold = parseFloat(document.getElementById('threshold').value)||0.75;
+    const showThreshold = Math.max(0.35, threshold-0.15);
+    identifyTooltip.style.left = tipLeft+'px';
+    identifyTooltip.style.top = tipTop+'px';
+    identifyTooltip.style.display = 'block';
+    if(bestSym && bestScore>=showThreshold){
+      identifyTooltip.style.borderColor = bestSym.color;
+      identifyTooltip.innerHTML = `<b style="color:${bestSym.color}">${bestSym.code}</b> — ${bestSym.name}<br><span style="color:var(--muted)">ความมั่นใจ ${Math.round(bestScore*100)}%</span>`;
+    } else {
+      identifyTooltip.style.borderColor = '#555';
+      identifyTooltip.innerHTML = `<span style="color:var(--muted)">ไม่พบสัญลักษณ์ที่ตรงกัน</span>`;
+    }
+  }).finally(()=>{ identifyBusy = false; });
+}
+
+async function identifyAt(px,py){
+  let bestScore = -1, bestSym = null;
+  const tmpCrop = document.createElement('canvas');
+  const tctx = tmpCrop.getContext('2d');
+  for(const sym of symbols){
+    const tw = Math.max(8, Math.round(sym.w || 40));
+    const th = Math.max(8, Math.round(sym.h || 40));
+    if(tw>=stage.width || th>=stage.height) continue;
+    const x0 = Math.min(Math.max(0, px-tw/2), stage.width-tw);
+    const y0 = Math.min(Math.max(0, py-th/2), stage.height-th);
+    tmpCrop.width = tw; tmpCrop.height = th;
+    tctx.drawImage(stage, x0,y0,tw,th, 0,0,tw,th);
+    if(!sym._img){ sym._img = await loadImage(sym.dataURL); }
+    const score = computeSimilarity(tmpCrop, sym._img);
+    if(score>bestScore){ bestScore = score; bestSym = sym; }
+  }
+  return {bestSym, bestScore};
+}
+
+/* Convert a Mat to a single-channel Mat for matching. When "shape-only" mode is on,
+   this reduces the image to its edge/outline pattern via Canny so color and
+   brightness differences (which change between captures) don't affect matching. */
+function preprocessForMatching(mat){
+  const shapeOnly = document.getElementById('shapeOnlyToggle').checked;
+  let gray = new cv.Mat();
+  cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+  if(!shapeOnly) return gray;
+  let blurred = new cv.Mat();
+  cv.GaussianBlur(gray, blurred, new cv.Size(3,3), 0);
+  let edges = new cv.Mat();
+  cv.Canny(blurred, edges, 40, 120);
+  gray.delete(); blurred.delete();
+  return edges;
+}
+
+function computeSimilarity(cropCanvas, symImg){
+  let cropMat, cropGray, templMat, templGray, result;
+  try{
+    cropMat = cv.imread(cropCanvas);
+    cropGray = preprocessForMatching(cropMat);
+    const tmp = document.createElement('canvas');
+    tmp.width = cropCanvas.width; tmp.height = cropCanvas.height;
+    tmp.getContext('2d').drawImage(symImg,0,0,tmp.width,tmp.height);
+    templMat = cv.imread(tmp);
+    templGray = preprocessForMatching(templMat);
+    result = new cv.Mat();
+    cv.matchTemplate(cropGray, templGray, result, cv.TM_CCOEFF_NORMED);
+    return result.data32F[0];
+  } finally {
+    if(cropMat) cropMat.delete();
+    if(cropGray) cropGray.delete();
+    if(templMat) templMat.delete();
+    if(templGray) templGray.delete();
+    if(result) result.delete();
+  }
+}
+document.getElementById('btnSaveCrop').onclick = ()=>{
+  if(!cropRect) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.round(cropRect.w); tmp.height = Math.round(cropRect.h);
+  tmp.getContext('2d').drawImage(stage, cropRect.x, cropRect.y, cropRect.w, cropRect.h, 0,0, tmp.width, tmp.height);
+  addSymbolFromDataURL(tmp.toDataURL('image/png'), tmp.width, tmp.height);
+  document.getElementById('btnCancelCrop').click();
+};
+
+/* ============ Overlay drawing ============ */
+function clearOverlay(){
+  overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height);
+}
+function drawBox(box, color, label){
+  const ctx = overlay.getContext('2d');
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.strokeRect(box.x, box.y, box.w, box.h);
+  ctx.fillStyle = color;
+  const textW = ctx.measureText(label).width + 8;
+  ctx.fillRect(box.x, Math.max(0,box.y-16), textW, 16);
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillText(label, box.x+4, Math.max(11,box.y-4));
+}
+
+/* ============ Template matching with OpenCV.js ============ */
+function iou(a,b){
+  const x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+  const x2=Math.min(a.x+a.w,b.x+b.w), y2=Math.min(a.y+a.h,b.y+b.h);
+  const inter = Math.max(0,x2-x1)*Math.max(0,y2-y1);
+  const union = a.w*a.h + b.w*b.h - inter;
+  return union<=0?0:inter/union;
+}
+function nms(boxes, threshold=0.3){
+  boxes.sort((a,b)=>b.score-a.score);
+  const kept=[];
+  for(const b of boxes){
+    if(!kept.some(k=>iou(k,b)>threshold)) kept.push(b);
+  }
+  return kept;
+}
+
+async function analyzeStage(){
+  if(!cvReady){ alert('เอนจินวิเคราะห์ภาพยังโหลดไม่เสร็จ กรุณารอสักครู่'); return; }
+  if(symbols.length===0){ alert('กรุณาเพิ่มสัญลักษณ์ในฐานข้อมูลก่อน'); return; }
+  clearOverlay();
+  const threshold = parseFloat(document.getElementById('threshold').value)||0.75;
+  const scales = [0.8,0.9,1.0,1.1,1.2];
+
+  let frameMat = cv.imread(stage);
+  let frameGray = preprocessForMatching(frameMat);
+
+  const counts = {};
+  symbols.forEach(s=>counts[s.id]=0);
+
+  for(const sym of symbols){
+    const templImg = await loadImage(sym.dataURL);
+    let allBoxes = [];
+    for(const scale of scales){
+      const tw = Math.round(templImg.width*scale), th = Math.round(templImg.height*scale);
+      if(tw<4||th<4||tw>frameGray.cols||th>frameGray.rows) continue;
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width=tw; tmpCanvas.height=th;
+      tmpCanvas.getContext('2d').drawImage(templImg,0,0,tw,th);
+      let templMat = cv.imread(tmpCanvas);
+      let templGray = preprocessForMatching(templMat);
+
+      let result = new cv.Mat();
+      cv.matchTemplate(frameGray, templGray, result, cv.TM_CCOEFF_NORMED);
+
+      let iterations=0;
+      while(iterations<40){
+        const mm = cv.minMaxLoc(result);
+        if(mm.maxVal < threshold) break;
+        allBoxes.push({x:mm.maxLoc.x, y:mm.maxLoc.y, w:tw, h:th, score:mm.maxVal});
+        // suppress this area so it isn't found again
+        const pt1 = new cv.Point(Math.max(0,mm.maxLoc.x-Math.floor(tw/2)), Math.max(0,mm.maxLoc.y-Math.floor(th/2)));
+        const pt2 = new cv.Point(Math.min(result.cols-1,mm.maxLoc.x+Math.floor(tw/2)), Math.min(result.rows-1,mm.maxLoc.y+Math.floor(th/2)));
+        cv.rectangle(result, pt1, pt2, new cv.Scalar(-1), -1);
+        iterations++;
+      }
+      result.delete(); templMat.delete(); templGray.delete();
+    }
+    const finalBoxes = nms(allBoxes, 0.25);
+    counts[sym.id] = finalBoxes.length;
+    finalBoxes.forEach(b=>drawBox(b, sym.color, sym.code));
+  }
+
+  frameMat.delete(); frameGray.delete();
+  renderResults(counts);
+}
+
+function loadImage(src){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.onload = ()=>resolve(img);
     img.src = src;
   });
 }
 
-$('clearBtn').addEventListener('click', async () => {
-  if (!confirm('ลบรูปพระแท้ทั้งหมด? (รวมรายการเทียบตำหนิและหมุดทุกจุด)')) return;
-  db = []; saveDB(); renderDB();
-  for (const m of masters) await idbDel(m.id);
-  masters = []; renderMasters();
-  $('status').textContent = '';
-});
-
-/* ============ สำรอง / กู้คืน (รวมองค์ครู) ============ */
-$('backupBtn').addEventListener('click', () => {
-  const d = new Date();
-  const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
-  const payload = { version: 2, refs: db, masters };
-  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `song-phra-backup-${stamp}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  $('status').textContent = `สำรองข้อมูลเรียบร้อย (ฐานส่อง ${db.length} รูป + องค์ครู ${masters.length} รูป) — เก็บไฟล์ไว้ใน Google Drive จะปลอดภัยที่สุด`;
-});
-$('restoreBtn').addEventListener('click', () => $('restoreInput').click());
-$('restoreInput').addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  try {
-    const data = JSON.parse(await f.text());
-    let refs = [], ms = [];
-    if (Array.isArray(data)) refs = data;                       // ไฟล์สำรองรุ่นเก่า
-    else { refs = data.refs || []; ms = data.masters || []; }
-    const existing = new Set(db.map(r => r.img));
-    let added = 0;
-    for (const r of refs){
-      if (r && Array.isArray(r.v) && typeof r.img === 'string' && !existing.has(r.img)){
-        db.push(r); existing.add(r.img); added++;
-      }
-    }
-    const mIds = new Set(masters.map(m => m.id));
-    let mAdded = 0;
-    for (const m of ms){
-      if (m && m.id && typeof m.img === 'string' && !mIds.has(m.id)){
-        if (await idbPut(m)){ masters.push(m); mIds.add(m.id); mAdded++; }
-      }
-    }
-    saveDB(); renderDB(); renderMasters();
-    $('status').textContent = `กู้คืนเรียบร้อย — ฐานส่อง +${added} รูป, องค์ครู +${mAdded} รูป`;
-    if (db.some(r => r.p !== PROC_VER)) loadDB();
-  } catch(err){
-    $('status').textContent = 'อ่านไฟล์สำรองไม่ได้ — ตรวจดูว่าเลือกไฟล์ song-phra-backup ที่ดาวน์โหลดจากแอปนี้';
-  }
-  e.target.value = '';
-});
-
-/* ============ เกณฑ์ราคา ============ */
-try {
-  const savedLimit = localStorage.getItem(LIMIT_KEY);
-  if (savedLimit) $('priceLimit').value = savedLimit;
-} catch(e){}
-$('priceLimit').addEventListener('change', () => {
-  try { localStorage.setItem(LIMIT_KEY, $('priceLimit').value); } catch(e){}
-});
-function getLimit(){
-  const v = parseFloat($('priceLimit').value);
-  return (isFinite(v) && v > 0) ? v : null;
-}
-
-/* ============ หน้าส่องพระ ============ */
-$('goBtn').addEventListener('click', startScan);
-$('stopBtn').addEventListener('click', stopScan);
-$('homeBtn').addEventListener('click', stopScan);   // ทำงานเหมือนกันทุกหน้า: หยุดกล้องถ้ามี แล้วกลับหน้าหลัก
-
-/* โหมดจับภาพหน้าจอ (สำหรับคอมที่กำลังเปิดไลฟ์ดูอยู่) — มีให้เฉพาะเบราว์เซอร์ที่รองรับ
-   (Chrome/Edge/Firefox บนคอม) มือถือส่วนใหญ่ไม่รองรับ API นี้จึงจะไม่เห็นปุ่มนี้เลย */
-if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia){
-  $('goScreenBtn').style.display = 'block';
-}
-$('goScreenBtn').addEventListener('click', () => startScan(true));
-$('zoomSlider').addEventListener('input', () => {
-  zoom = parseFloat($('zoomSlider').value);
-  $('zoomVal').textContent = zoom.toFixed(1) + 'x';
-  $('cam').style.transform = `scale(${zoom})`;
-});
-
-async function startScan(fromScreen){
-  await ensureNet();
-  $('status').textContent = fromScreen
-    ? 'เลือกแท็บ/หน้าต่างที่กำลังเปิดไลฟ์อยู่ในกล่องที่เบราว์เซอร์เด้งขึ้นมา…'
-    : 'กำลังเปิดกล้อง… (กดอนุญาตใช้กล้องเมื่อระบบถาม)';
-  try {
-    if (fromScreen){
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'never' }, audio: false });
-      // ถ้าผู้ใช้กดปุ่ม "หยุดการแชร์" จากแถบเบราว์เซอร์เอง ให้กลับหน้าหลักอัตโนมัติ
-      stream.getVideoTracks()[0].addEventListener('ended', () => stopScan());
-    } else {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: {ideal: 1280}, height: {ideal: 1280} },
-        audio: false
-      });
-    }
-  } catch(e){
-    $('status').textContent = fromScreen
-      ? 'ไม่ได้เลือกหน้าจอ/แท็บ หรือเบราว์เซอร์นี้ไม่รองรับ — ลองใหม่หรือใช้ Chrome/Edge'
-      : 'เปิดกล้องไม่ได้ — ต้องเปิดผ่านลิงก์ https และกดอนุญาตใช้กล้อง';
-    return;
-  }
-  const v = $('cam');
-  v.srcObject = stream;
-  await v.play();
-  screenMode = !!fromScreen;
-  roi = null;
-  capturedShots = [];
-  renderShotGallery();
-  if (fromScreen){ zoom = 1; $('zoomSlider').value = 1; $('zoomVal').textContent = '1.0x'; $('cam').style.transform = 'scale(1)'; }
-  $('zoomRow').style.display = fromScreen ? 'none' : 'flex';
-  $('roiRow').style.display = fromScreen ? 'flex' : 'none';
-  $('roiLayer').classList.toggle('active', !!fromScreen);
-  $('roiBox').style.display = 'none';
-  $('capBtn').textContent = fromScreen ? '📸 เก็บภาพนี้ (ไปเทียบทีหลังได้)' : '📸 เก็บภาพนี้ไว้เทียบตำหนิ';
-  showPage('pgScan');
-  $('status').textContent = fromScreen ? 'กำลังวิเคราะห์ภาพจากหน้าจอแบบเรียลไทม์…' : '';
-  running = true;
-  scanLoop();
-}
-function setRing(ringId, pctId, pct){
-  const numEl = $(pctId);
-  numEl.textContent = pct + '%';
-  const color = pct >= 70 ? 'var(--high)' : 'var(--low)';
-  numEl.style.color = color;
-  const ring = $(ringId);
-  ring.style.stroke = color;
-  ring.style.strokeDashoffset = CIRC - (CIRC * pct / 100);
-}
-function showPrice(rec){
-  const bar = $('priceBar'), txt = $('priceText'), sub = $('priceSub');
-  bar.style.display = 'block';
-  if (typeof rec.price === 'number'){
-    txt.textContent = rec.price.toLocaleString('th-TH') + ' บาท';
-    const lim = getLimit();
-    if (lim !== null){
-      const ok = rec.price <= lim;
-      txt.style.color = ok ? 'var(--high)' : 'var(--low)';
-      sub.textContent = ok
-        ? `ไม่เกินเกณฑ์ที่ตั้งไว้ (${lim.toLocaleString('th-TH')} บาท)`
-        : `เกินเกณฑ์ที่ตั้งไว้ (${lim.toLocaleString('th-TH')} บาท)`;
-    } else {
-      txt.style.color = 'var(--gold)';
-      sub.textContent = 'ราคาของรูปที่จับคู่ได้ (ยังไม่ได้ตั้งเกณฑ์ราคา)';
-    }
+function renderResults(counts){
+  lastCounts = counts;
+  const body = document.getElementById('resultBody');
+  body.innerHTML='';
+  let total=0, grandValue=0, hasPricing=false;
+  symbols.forEach(sym=>{
+    const c = counts[sym.id]||0;
+    total+=c;
+    const badge = document.getElementById('badge-'+sym.id);
+    if(badge) badge.textContent = c;
+    const rowTotal = (sym.price!=null) ? c*sym.price : null;
+    if(rowTotal!=null){ grandValue += rowTotal; hasPricing = true; }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:${sym.color};font-weight:700;">${sym.code}</td><td>${sym.name}</td><td>${sym.unit||'-'}</td><td style="text-align:right;">${c}</td><td style="text-align:right;">${fmtMoney(sym.price)}</td><td style="text-align:right;">${fmtMoney(rowTotal)}</td>`;
+    body.appendChild(tr);
+  });
+  if(symbols.length===0) body.innerHTML='<tr><td colspan="6" class="empty">ยังไม่มีผลวิเคราะห์</td></tr>';
+  document.getElementById('totalCount').textContent = total;
+  const valueBox = document.getElementById('totalValueBox');
+  if(hasPricing){
+    valueBox.style.display='block';
+    document.getElementById('totalValue').textContent = fmtMoney(grandValue);
   } else {
-    txt.textContent = 'ไม่ได้ระบุราคา';
-    txt.style.color = 'var(--muted)';
-    sub.textContent = 'แตะรูปในหน้าหลักเพื่อใส่ราคา';
+    valueBox.style.display='none';
   }
-}
-/* คำนวณกรอบสี่เหลี่ยม (พิกัดพิกเซลจริงของวิดีโอ) ที่จะตัดมาวิเคราะห์
-   - โหมดกล้อง: ใช้กึ่งกลางภาพตามระดับซูม (เหมือนเดิม)
-   - โหมดหน้าจอ + มีกรอบที่ลากเลือกไว้: ใช้กรอบนั้นแทน (แม่นกว่าการครอปกลางจอ) */
-function getCropRegion(v){
-  const vw = v.videoWidth, vh = v.videoHeight;
-  if (screenMode && roi){
-    const s0 = Math.min(vw, vh);
-    const baseX0 = (vw-s0)/2, baseY0 = (vh-s0)/2;
-    return { baseX: baseX0 + roi.fx0*s0, baseY: baseY0 + roi.fy0*s0, s: roi.fw*s0 };
-  }
-  const s = Math.min(vw, vh) / zoom;
-  return { baseX: (vw-s)/2, baseY: (vh-s)/2, s };
 }
 
-/* ---------- ลากเลือกกรอบวิเคราะห์ (เฉพาะโหมดหน้าจอคอม) ---------- */
-$('roiResetBtn').addEventListener('click', () => {
-  roi = null;
-  $('roiBox').style.display = 'none';
-  $('status').textContent = 'ใช้ทั้งภาพแทนแล้ว';
-});
-(function bindRoiDrag(){
-  const layer = $('roiLayer'), box = $('roiBox');
-  let dragging = false, sx = 0, sy = 0;
-  function frac(e, rect){
-    return {
-      x: Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width)),
-      y: Math.max(0, Math.min(1, (e.clientY-rect.top)/rect.height))
-    };
-  }
-  layer.addEventListener('pointerdown', e => {
-    if (!screenMode) return;
-    dragging = true;
-    layer.setPointerCapture(e.pointerId);
-    const rect = layer.getBoundingClientRect();
-    const p = frac(e, rect);
-    sx = p.x; sy = p.y;
-    box.style.display = 'block';
+document.getElementById('btnExportExcel').onclick = ()=>{
+  if(!lastCounts || symbols.length===0){ alert('กรุณากด "วิเคราะห์สัญลักษณ์ในภาพนี้" อย่างน้อยหนึ่งครั้งก่อนส่งออก'); return; }
+  const data = [['รหัส','รายการ','หน่วย','จำนวน','ราคา/หน่วย','รวม']];
+  let grandTotal = 0;
+  symbols.forEach(sym=>{
+    const qty = lastCounts[sym.id]||0;
+    const rowTotal = (sym.price!=null) ? qty*sym.price : '';
+    if(sym.price!=null) grandTotal += qty*sym.price;
+    data.push([sym.code, sym.name, sym.unit||'', qty, sym.price??'', rowTotal]);
   });
-  layer.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const rect = layer.getBoundingClientRect();
-    const p = frac(e, rect);
-    // บังคับเป็นสี่เหลี่ยมจัตุรัสเสมอ (ให้เข้ากับระบบประมวลผลที่ใช้ภาพสี่เหลี่ยมจัตุรัส)
-    const size = Math.max(Math.abs(p.x-sx), Math.abs(p.y-sy));
-    const fx0 = p.x >= sx ? sx : sx-size;
-    const fy0 = p.y >= sy ? sy : sy-size;
-    box.style.left = (fx0*100) + '%';
-    box.style.top = (fy0*100) + '%';
-    box.style.width = (size*100) + '%';
-    box.style.height = (size*100) + '%';
-  });
-  layer.addEventListener('pointerup', () => {
-    if (!dragging) return;
-    dragging = false;
-    const l = parseFloat(box.style.left)/100, t = parseFloat(box.style.top)/100;
-    const w = parseFloat(box.style.width)/100;
-    if (w < 0.04){ box.style.display = 'none'; return; }   // ลากนิดเดียว = ยกเลิก
-    roi = { fx0: l, fy0: t, fw: w };
-    $('status').textContent = 'เลือกกรอบวิเคราะห์แล้ว';
-  });
-})();
+  data.push(['','','','','รวมทั้งหมด', grandTotal||0]);
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:10},{wch:40},{wch:8},{wch:8},{wch:12},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'สรุปผลวิเคราะห์');
+  const dateStr = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `สรุปผลวิเคราะห์_${dateStr}.xlsx`);
+};
 
-/* ---------- คลังภาพที่เก็บระหว่างเซสชัน (โหมดหน้าจอคอม) ---------- */
-function renderShotGallery(){
-  $('shotGallery').style.display = (screenMode && capturedShots.length) ? 'block' : 'none';
-  const strip = $('shotStrip'); strip.innerHTML = '';
-  capturedShots.forEach(shot => {
-    const t = document.createElement('div');
-    t.className = 'shotThumb';
-    t.innerHTML = `<img src="${shot.thumb}"><span class="del">✕</span>`;
-    t.querySelector('img').addEventListener('click', () => useShotForCompare(shot));
-    t.querySelector('.del').addEventListener('click', ev => {
-      ev.stopPropagation();
-      capturedShots = capturedShots.filter(s => s.id !== shot.id);
-      renderShotGallery();
-    });
-    strip.appendChild(t);
-  });
+document.getElementById('btnAnalyze').onclick = analyzeStage;
+
+/* ============ Continuous mode ============ */
+document.getElementById('continuousToggle').onchange = (e)=>{
+  if(e.target.checked) startContinuous(); else stopContinuous();
+};
+function startContinuous(){
+  stopContinuous();
+  const sec = parseInt(document.getElementById('intervalSec').value)||3;
+  continuousTimer = setInterval(async ()=>{
+    if(!stream) return;
+    drawVideoFrameToStage();
+    await analyzeStage();
+  }, sec*1000);
 }
-async function useShotForCompare(shot){
-  sessionSuspect = shot.crop;
-  running = false;
-  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
-  $('status').textContent = 'กำลังหาว่าตรงกับองค์ครูองค์ไหนที่สุด…';
-  try {
-    await ensureNet();
-    sessionSuspectVec = (await analyzeImageSource(sessionSuspect)).v;
-  } catch(e){ sessionSuspectVec = null; }
-  suspectVec = sessionSuspectVec;
-  if (suspectVec && masters.length){
-    await rankMasters();
-    const b = bestMaster();
-    if (b){
-      await openWorkspace(b.m);
-      $('status').textContent = `ระบบเลือกองค์ครู "${b.m.name}" ให้อัตโนมัติ — ตรงที่สุด ${b.pct}%`;
-      return;
-    }
-  }
-  showPage('pgMasters');
-  $('status').textContent = masters.length
-    ? 'แตะองค์ครูที่จะเทียบด้วยได้เลย'
-    : 'ยังไม่มีองค์ครูในคลัง กด "+ เพิ่มรูปพระแท้" ในหน้าหลักก่อน';
+function stopContinuous(){
+  if(continuousTimer){ clearInterval(continuousTimer); continuousTimer=null; }
 }
 
-async function scanLoop(){
-  if (!running) return;
-  try {
-    const v = $('cam');
-    if (v.videoWidth && db.length){
-      const { baseX, baseY, s } = getCropRegion(v);
-      const { q, qh } = await analyzeVideoFrame(v, baseX, baseY, s);
-      let best = -1, bi = -1;
-      for (let i = 0; i < db.length; i++){
-        const c = cosine(q, db[i].v);
-        if (isFinite(c) && c > best){ best = c; bi = i; }
-      }
-      if (bi >= 0){
-        setRing('shapeRing', 'shapePct', shapeToPct(best));
-        if (db[bi].h) setRing('colorRing', 'colorPct', colorToPct(histSim(qh, db[bi].h)));
-        $('matchImg').src = db[bi].img;
-        showPrice(db[bi]);
-      }
-    }
-  } catch(err){ /* ข้ามเฟรมที่มีปัญหา */ }
-  if (running) setTimeout(scanLoop, 300);
-}
-function stopScan(){
-  running = false;
-  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
-  $('zoomRow').style.display = 'flex';
-  $('roiRow').style.display = 'none';
-  $('roiLayer').classList.remove('active');
-  showPage('pgSetup');
-  $('status').textContent = '';
-}
+/* ============ Excel price/code database import ============ */
+let importedWorkbook = null, currentSheetData = [];
 
-/* 📸 เก็บภาพ — โหมดกล้อง: ทำงานทันที (เหมือนเดิม) / โหมดหน้าจอ: เก็บเข้าคลังภาพ เลือกใช้ทีหลังได้ */
-async function doCapture(){
-  const v = $('cam');
-  if (!v.videoWidth){ $('status').textContent = 'ภาพยังไม่พร้อม'; return; }
-  const { baseX, baseY, s } = getCropRegion(v);
-  const hi = document.createElement('canvas');
-  const S = Math.min(1200, Math.round(s));
-  hi.width = S; hi.height = S;
-  hi.getContext('2d').drawImage(v, baseX, baseY, s, s, 0, 0, S, S);
-  const crop = cropForCompare(hi);
-
-  if (screenMode){
-    const th = document.createElement('canvas'); th.width = 140; th.height = 140;
-    th.getContext('2d').drawImage(crop, 0, 0, 140, 140);
-    capturedShots.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2,5), thumb: th.toDataURL('image/jpeg', 0.75), crop });
-    renderShotGallery();
-    $('status').textContent = `เก็บภาพแล้ว (${capturedShots.length}) — แตะภาพด้านล่างเพื่อเลือกไปเทียบ หรือเก็บต่อได้เรื่อยๆ`;
-    return;
-  }
-  // โหมดกล้อง: พฤติกรรมเดิม — ไปเทียบทันที
-  sessionSuspect = crop;
-  running = false;
-  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
-  $('status').textContent = '📸 เก็บภาพแล้ว กำลังหาว่าตรงกับองค์ครูองค์ไหนที่สุด…';
-  try {
-    await ensureNet();
-    sessionSuspectVec = (await analyzeImageSource(sessionSuspect)).v;
-  } catch(e){ sessionSuspectVec = null; }
-  suspectVec = sessionSuspectVec;
-  if (suspectVec && masters.length){
-    await rankMasters();
-    const b = bestMaster();
-    if (b){
-      await openWorkspace(b.m);
-      $('status').textContent = `ระบบเลือกองค์ครู "${b.m.name}" ให้อัตโนมัติ — ตรงที่สุด ${b.pct}%`;
-      return;
-    }
-  }
-  showPage('pgMasters');
-  $('status').textContent = masters.length
-    ? '📸 เก็บภาพเรียบร้อย — แตะองค์ครูที่จะเทียบด้วยได้เลย'
-    : '📸 เก็บภาพเรียบร้อย — ยังไม่มีองค์ครูในคลัง กด "+ เพิ่มรูปพระแท้" ก่อน';
-}
-$('capBtn').addEventListener('click', doCapture);
-/* คีย์ลัด: กด Spacebar เพื่อ 📸 ระหว่างอยู่หน้าส่องพระ (สะดวกเวลาต้องจับจังหวะจากไลฟ์) */
-document.addEventListener('keydown', e => {
-  if (e.code !== 'Space') return;
-  if (!$('pgScan').classList.contains('on')) return;
-  const tag = (document.activeElement && document.activeElement.tagName) || '';
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
-  e.preventDefault();
-  doCapture();
-});
-
-/* ============ จับคู่องค์ครูอัตโนมัติ ============ */
-async function ensureMasterVecs(){
-  const needs = masters.filter(m => !Array.isArray(m.v));
-  if (!needs.length) return;
-  await ensureNet();
-  let done = 0;
-  for (const m of needs){
-    try {
-      const img = await srcToImage(m.img);
-      const { v } = await analyzeImageSource(img);
-      m.v = v;
-      await idbPut(m);
-    } catch(e){}
-    done++;
-    $('status').textContent = `กำลังเตรียมองค์ครูสำหรับจับคู่ ${done}/${needs.length}…`;
-  }
-  $('status').textContent = '';
-}
-async function rankMasters(){
-  if (!suspectVec || !masters.length) return;
-  await ensureMasterVecs();
-  masterScores = {};
-  masters.forEach(m => {
-    if (Array.isArray(m.v)){
-      const c = cosine(suspectVec, m.v);
-      if (isFinite(c)) masterScores[m.id] = shapeToPct(c);
-    }
-  });
-  renderMasters();
-}
-function bestMaster(){
-  let best = null, bp = -1;
-  masters.forEach(m => {
-    const p = masterScores[m.id];
-    if (p != null && p > bp){ bp = p; best = m; }
-  });
-  return best ? { m: best, pct: bp } : null;
-}
-function updateWsMatch(){
-  const bar = $('wsMatchBar');
-  if (!suspectVec || !curMaster || !Array.isArray(curMaster.v)){
-    bar.style.display = 'none';
-    return;
-  }
-  const pct = shapeToPct(cosine(suspectVec, curMaster.v));
-  bar.style.display = 'block';
-  const t = $('wsMatchPct');
-  t.textContent = pct + '%';
-  t.style.color = pct >= 70 ? 'var(--high)' : 'var(--low)';
-  const b = bestMaster();
-  $('wsMatchSub').textContent = (b && b.m.id !== curMaster.id)
-    ? `ความเหมือนพิมพ์ทรงกับองค์ครูนี้ · องค์ครูที่ตรงสุดคือ "${b.m.name}" (${b.pct}%)`
-    : 'ความเหมือนพิมพ์ทรงระหว่างองค์ที่ตรวจสอบกับองค์ครูนี้';
-}
-
-/* ============ หน้าคู่มือการใช้งาน ============ */
-$('helpBtn').addEventListener('click', () => showPage('pgHelp'));
-$('helpBackBtn').addEventListener('click', () => showPage('pgSetup'));
-
-/* ============ หน้ารายการองค์ครู ============ */
-$('compareBtn').addEventListener('click', () => { showPage('pgMasters'); $('status').textContent = ''; });
-$('mastersBackBtn').addEventListener('click', () => { showPage('pgSetup'); $('status').textContent = ''; });
-
-/* ============ หน้าเทียบตำหนิ (workspace) ============ */
-let curMaster = null;
-let masterCrop = null, suspectCrop = null;
-let view = { z: 1, cx: 0.5, cy: 0.5 };
-let wsMode = 'dual';
-let opacity = 0.5;
-let addingPin = false;
-let checks = {};          // index หมุด -> 'ok' | 'no'
-let circleMode = false;   // true = กำลังลากวาดวงกลมเน้นตำหนิ (แทนการเลื่อนภาพ)
-let circleDraft = null;   // วงที่กำลังลากอยู่ {nx,ny,nr}
-let focusCircle = null;   // วงที่วาดเสร็จแล้ว {nx,ny,nr}
-let lastCirclePct = null; // % ล่าสุดของวงที่วาด (ไว้กำหนดสีวง)
-
-async function openWorkspace(m){
-  curMaster = m;
-  $('wsName').textContent = m.name;
-  const img = await srcToImage(m.img);
-  masterCrop = cropForCompare(img);
-  suspectCrop = sessionSuspect || null;
-  if (suspectCrop === sessionSuspect) suspectVec = sessionSuspectVec;
-  view = { z: 1, cx: 0.5, cy: 0.5 };
-  wsMode = 'dual'; opacity = 0.5; addingPin = false; checks = {};
-  circleMode = false; circleDraft = null; focusCircle = null; lastCirclePct = null;
-  $('wsZoom').value = 1; $('wsZoomVal').textContent = '1.0x';
-  $('opSlider').value = 50; $('opVal').textContent = '50%';
-  $('useCapBtn').style.display = sessionSuspect ? 'block' : 'none';
-  $('focusPanel').style.display = 'none';
-  updateCircleModeBtn();
-  setMode('dual');
-  showPage('pgCompare');
-  $('status').textContent = suspectCrop ? '' : 'ยังไม่มีรูปองค์ที่ตรวจสอบ — กดปุ่มด้านล่างเพื่อเลือกรูป หรือกลับไปถ่ายจากหน้าส่อง';
-  updateWsMatch();
-  renderPinsPanel();
-  redraw();
-}
-$('wsBackBtn').addEventListener('click', () => { showPage('pgMasters'); $('status').textContent = ''; });
-
-$('renameMasterBtn').addEventListener('click', async () => {
-  if (!curMaster) return;
-  const nm = await askText('ชื่อองค์ครู', curMaster.name);
-  if (nm === null || !nm.trim()) return;
-  curMaster.name = nm.trim();
-  await idbPut(curMaster);
-  $('wsName').textContent = curMaster.name;
-  renderMasters();
-});
-$('delMasterBtn').addEventListener('click', async () => {
-  if (!curMaster) return;
-  if (!confirm(`ลบรูป "${curMaster.name}" ออกจากทั้งฐานส่องและหน้าเทียบตำหนิ?`)) return;
-  await idbDel(curMaster.id);
-  masters = masters.filter(x => x.id !== curMaster.id);
-  db = db.filter(r => r.mid !== curMaster.id);
-  saveDB(); renderDB(); renderMasters();
-  showPage('pgMasters');
-});
-
-/* โหมดแท็บ */
-$('tabDual').addEventListener('click', () => setMode('dual'));
-$('tabOverlay').addEventListener('click', () => setMode('overlay'));
-$('tabPins').addEventListener('click', () => setMode('pins'));
-function setMode(m){
-  wsMode = m;
-  $('tabDual').className = m==='dual' ? 'on' : '';
-  $('tabOverlay').className = m==='overlay' ? 'on' : '';
-  $('tabPins').className = m==='pins' ? 'on' : '';
-  $('dualWrap').style.display = (m==='dual' || m==='pins') ? 'flex' : 'none';
-  $('ovWrap').style.display = m==='overlay' ? 'block' : 'none';
-  $('pinPanel').style.display = m==='pins' ? 'block' : 'none';
-  $('circleModeRow').style.display = m==='dual' ? 'flex' : 'none';
-  if (m === 'overlay') $('focusPanel').style.display = 'none';
-  if (m !== 'dual'){ circleMode = false; circleDraft = null; updateCircleModeBtn(); }
-  addingPin = false;
-  $('addPinBtn').textContent = '➕ เพิ่มหมุดตำหนิ (กดแล้วแตะจุดบนรูปองค์ครู)';
-  redraw();
-}
-
-/* ปุ่มโหมดวาดวงกลมเน้นตำหนิ */
-function updateCircleModeBtn(){
-  const btn = $('circleModeBtn');
-  btn.classList.toggle('active', circleMode);
-  btn.textContent = circleMode ? '🎯 กำลังวาดวง — ลากบนรูปเพื่อวง (แตะซ้ำเพื่อปิด)' : '🎯 วาดวงกลมเน้นตำหนิ';
-  $('circleClearBtn').style.display = focusCircle ? 'block' : 'none';
-}
-$('circleModeBtn').addEventListener('click', () => {
-  circleMode = !circleMode;
-  circleDraft = null;
-  updateCircleModeBtn();
-});
-$('circleClearBtn').addEventListener('click', () => {
-  focusCircle = null; circleDraft = null; lastCirclePct = null;
-  updateCircleModeBtn();
-  $('focusPanel').style.display = 'none';
-  redraw();
-});
-
-/* ซูม/ความเข้ม */
-$('wsZoom').addEventListener('input', () => {
-  view.z = parseFloat($('wsZoom').value);
-  $('wsZoomVal').textContent = view.z.toFixed(1) + 'x';
-  redraw();
-});
-$('opSlider').addEventListener('input', () => {
-  opacity = parseFloat($('opSlider').value) / 100;
-  $('opVal').textContent = Math.round(opacity*100) + '%';
-  redraw();
-});
-
-/* เลือกรูปองค์ที่ตรวจสอบ */
-$('useCapBtn').addEventListener('click', async () => {
-  if (sessionSuspect){
-    suspectCrop = sessionSuspect;
-    suspectVec = sessionSuspectVec;
-    await rankMasters();
-    updateWsMatch();
-    $('status').textContent = '';
-    redraw();
-  }
-});
-$('pickSuspectBtn').addEventListener('click', () => $('suspectInput').click());
-$('suspectInput').addEventListener('change', async e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  try {
-    const img = await fileToImage(f);
-    const mx = Math.max(img.width, img.height);
-    const sc = mx > 1600 ? 1600/mx : 1;
-    const cv = document.createElement('canvas');
-    cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
-    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    suspectCrop = cropForCompare(cv);
-    redraw();
-    $('status').textContent = 'กำลังคำนวณความเหมือนกับองค์ครู…';
-    await ensureNet();
-    suspectVec = (await analyzeImageSource(suspectCrop)).v;
-    await rankMasters();
-    updateWsMatch();
-    const b = bestMaster();
-    $('status').textContent = (b && curMaster && b.m.id !== curMaster.id)
-      ? `หมายเหตุ: องค์ครูที่ตรงสุดคือ "${b.m.name}" (${b.pct}%) — กลับไปหน้ารายการเพื่อเปิดดูได้`
-      : '';
-    redraw();
-  } catch(err){ $('status').textContent = 'อ่านรูปไม่ได้ ลองรูปอื่น'; }
+document.getElementById('btnImportExcel').onclick = ()=> document.getElementById('fileExcelImport').click();
+document.getElementById('fileExcelImport').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    const data = new Uint8Array(ev.target.result);
+    importedWorkbook = XLSX.read(data, {type:'array'});
+    const sheetSelect = document.getElementById('sheetSelect');
+    sheetSelect.innerHTML = importedWorkbook.SheetNames.map(n=>`<option value="${n}">${n}</option>`).join('');
+    document.getElementById('importMapping').style.display='block';
+    renderExcelPreview();
+  };
+  reader.readAsArrayBuffer(file);
   e.target.value = '';
+};
+document.getElementById('sheetSelect').onchange = renderExcelPreview;
+
+function colLetterToIndex(letter){
+  letter = (letter||'').trim().toUpperCase();
+  if(!letter) return -1;
+  let idx=0;
+  for(let i=0;i<letter.length;i++){
+    const code = letter.charCodeAt(i)-64;
+    if(code<1||code>26) return -1;
+    idx = idx*26 + code;
+  }
+  return idx-1;
+}
+function indexToColLetter(idx){
+  let s='', n=idx+1;
+  while(n>0){ const rem=(n-1)%26; s=String.fromCharCode(65+rem)+s; n=Math.floor((n-1)/26); }
+  return s;
+}
+
+function renderExcelPreview(){
+  const sheetName = document.getElementById('sheetSelect').value;
+  const sheet = importedWorkbook.Sheets[sheetName];
+  currentSheetData = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+  const sampleRows = currentSheetData.slice(0,20);
+  const maxCols = Math.max(1, ...sampleRows.map(r=>r.length));
+  let html = '<table><thead><tr><th>#แถว</th>';
+  for(let c=0;c<maxCols;c++) html += `<th>${indexToColLetter(c)}</th>`;
+  html += '</tr></thead><tbody>';
+  sampleRows.forEach((row,ridx)=>{
+    html += `<tr><td style="color:var(--muted);">${ridx+1}</td>`;
+    for(let c=0;c<maxCols;c++){
+      html += `<td>${(row[c]??'').toString().slice(0,30)}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('previewTableWrap').innerHTML = html;
+}
+
+document.getElementById('btnConfirmImport').onclick = async ()=>{
+  const codeIdx = colLetterToIndex(document.getElementById('colCode').value);
+  const nameIdx = colLetterToIndex(document.getElementById('colName').value);
+  const unitIdx = colLetterToIndex(document.getElementById('colUnit').value);
+  const priceIdx = colLetterToIndex(document.getElementById('colPrice').value);
+  const startRow = Math.max(1, parseInt(document.getElementById('startRow').value)||1);
+  if(codeIdx<0){ alert('กรุณาระบุคอลัมน์รหัสให้ถูกต้อง (เช่น A)'); return; }
+  const rows = [];
+  for(let i=startRow-1;i<currentSheetData.length;i++){
+    const r = currentSheetData[i];
+    if(!r) continue;
+    const code = (r[codeIdx]??'').toString().trim();
+    if(!code) continue;
+    const name = nameIdx>=0 ? (r[nameIdx]??'').toString().trim() : '';
+    const unit = unitIdx>=0 ? (r[unitIdx]??'').toString().trim() : '';
+    let price = priceIdx>=0 ? r[priceIdx] : null;
+    price = (price===''||price==null||isNaN(parseFloat(price))) ? null : parseFloat(price);
+    rows.push({code,name,unit,price});
+  }
+  if(rows.length===0){ alert('ไม่พบข้อมูลที่นำเข้าได้ ตรวจสอบคอลัมน์/แถวเริ่มต้นอีกครั้ง'); return; }
+  if(priceList.length>0 && !confirm(`จะแทนที่ฐานข้อมูลราคาเดิม (${priceList.length} รายการ) ด้วยข้อมูลใหม่ (${rows.length} รายการ) ใช่หรือไม่?`)) return;
+  await clearPriceListDB();
+  await addPriceRowsBulk(rows);
+  await refreshPriceListUI();
+  document.getElementById('importMapping').style.display='none';
+  alert(`นำเข้าฐานข้อมูลราคาสำเร็จ ${rows.length} รายการ`);
+};
+
+document.getElementById('btnClearPriceDb').onclick = async ()=>{
+  if(!confirm('ล้างฐานข้อมูลราคาทั้งหมด?')) return;
+  await clearPriceListDB();
+  await refreshPriceListUI();
+};
+
+async function refreshPriceListUI(){
+  priceList = await getAllPriceRowsFromDB();
+  const status = document.getElementById('priceDbStatus');
+  const clearBtn = document.getElementById('btnClearPriceDb');
+  if(priceList.length>0){
+    status.textContent = `มี ${priceList.length} รายการในฐานข้อมูลราคา`;
+    clearBtn.style.display='inline-block';
+  } else {
+    status.textContent = 'ยังไม่ได้นำเข้าฐานข้อมูลราคา';
+    clearBtn.style.display='none';
+  }
+}
+
+/* ============ Screen-capture-to-symbol (independent of the main plan stage) ============ */
+const captureModalOverlay = document.getElementById('captureModalOverlay');
+const captureCanvas = document.getElementById('captureCanvas');
+const captureCropOverlay = document.getElementById('captureCropOverlay');
+const captureEmpty = document.getElementById('captureEmpty');
+let captureCropStart = null, captureCropRect = null;
+let captureZoom = 1, captureNaturalW = 0, captureNaturalH = 0;
+
+document.getElementById('btnCaptureSymbol').onclick = async ()=>{
+  captureModalOverlay.style.display = 'flex';
+  await doScreenCaptureForSymbol();
+};
+document.getElementById('btnRecapture').onclick = doScreenCaptureForSymbol;
+document.getElementById('btnCloseCaptureModal').onclick = closeCaptureModal;
+document.getElementById('btnZoomIn').onclick = ()=> setCaptureZoom(captureZoom*1.4);
+document.getElementById('btnZoomOut').onclick = ()=> setCaptureZoom(captureZoom/1.4);
+document.getElementById('btnZoomReset').onclick = ()=> setCaptureZoom(1);
+
+function setCaptureZoom(z){
+  if(!captureNaturalW) return;
+  captureZoom = Math.min(4, Math.max(0.15, z));
+  const dispW = Math.round(captureNaturalW*captureZoom);
+  const dispH = Math.round(captureNaturalH*captureZoom);
+  captureCanvas.style.width = dispW+'px';
+  captureCanvas.style.height = dispH+'px';
+  captureCropOverlay.style.width = dispW+'px';
+  captureCropOverlay.style.height = dispH+'px';
+  document.getElementById('zoomLabel').textContent = Math.round(captureZoom*100)+'%';
+}
+
+function closeCaptureModal(){
+  captureModalOverlay.style.display = 'none';
+  captureCropRect = null; captureCropStart = null;
+  document.getElementById('btnSaveCaptureSymbol').disabled = true;
+  captureCropOverlay.getContext('2d').clearRect(0,0,captureCropOverlay.width,captureCropOverlay.height);
+}
+
+async function doScreenCaptureForSymbol(){
+  captureEmpty.style.display = 'block';
+  captureEmpty.textContent = 'กำลังขอสิทธิ์แชร์หน้าจอ...';
+  document.getElementById('btnSaveCaptureSymbol').disabled = true;
+  captureCropRect = null;
+  try{
+    const s = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'never'}, audio:false});
+    const tempVideo = document.createElement('video');
+    tempVideo.muted = true;
+    tempVideo.srcObject = s;
+    await tempVideo.play();
+    await new Promise(r=>setTimeout(r,150)); // let the first real frame render
+    captureCanvas.width = tempVideo.videoWidth;
+    captureCanvas.height = tempVideo.videoHeight;
+    captureNaturalW = tempVideo.videoWidth;
+    captureNaturalH = tempVideo.videoHeight;
+    captureCanvas.getContext('2d').drawImage(tempVideo,0,0);
+    captureCropOverlay.width = tempVideo.videoWidth;
+    captureCropOverlay.height = tempVideo.videoHeight;
+    captureCropOverlay.getContext('2d').clearRect(0,0,captureCropOverlay.width,captureCropOverlay.height);
+    s.getTracks().forEach(t=>t.stop()); // only needed a single snapshot
+    // fit the capture to the visible box width initially, then let the user zoom in further
+    const wrapW = document.getElementById('captureStageWrap').clientWidth || captureNaturalW;
+    const fitZoom = Math.min(1, wrapW/captureNaturalW);
+    setCaptureZoom(fitZoom);
+    captureEmpty.style.display = 'none';
+  }catch(err){
+    captureEmpty.style.display = 'block';
+    captureEmpty.textContent = 'ไม่สามารถแคปหน้าจอได้: '+err.message;
+  }
+}
+
+captureCropOverlay.addEventListener('mousedown', e=>{
+  const rect = captureCropOverlay.getBoundingClientRect();
+  const scaleX = captureCropOverlay.width/rect.width, scaleY = captureCropOverlay.height/rect.height;
+  captureCropStart = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+});
+captureCropOverlay.addEventListener('mousemove', e=>{
+  if(!captureCropStart) return;
+  const rect = captureCropOverlay.getBoundingClientRect();
+  const scaleX = captureCropOverlay.width/rect.width, scaleY = captureCropOverlay.height/rect.height;
+  const cur = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+  captureCropRect = { x:Math.min(captureCropStart.x,cur.x), y:Math.min(captureCropStart.y,cur.y), w:Math.abs(cur.x-captureCropStart.x), h:Math.abs(cur.y-captureCropStart.y) };
+  const ctx = captureCropOverlay.getContext('2d');
+  ctx.clearRect(0,0,captureCropOverlay.width,captureCropOverlay.height);
+  ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 2;
+  ctx.strokeRect(captureCropRect.x, captureCropRect.y, captureCropRect.w, captureCropRect.h);
+});
+captureCropOverlay.addEventListener('mouseup', ()=>{
+  captureCropStart = null;
+  document.getElementById('btnSaveCaptureSymbol').disabled = !(captureCropRect && captureCropRect.w>3 && captureCropRect.h>3);
 });
 
-/* ---------- วาดภาพตาม view ---------- */
-function computeSrcRect(src){
-  const sw = src.width / view.z;
-  let sx = view.cx*src.width - sw/2;
-  let sy = view.cy*src.height - sw/2;
-  sx = Math.max(0, Math.min(src.width - sw, sx));
-  sy = Math.max(0, Math.min(src.height - sw, sy));
-  return { sx, sy, sw };
-}
-function drawInto(cv, src, withPins){
-  const ctx = cv.getContext('2d');
-  const S = cv.width;
-  ctx.fillStyle = '#141008'; ctx.fillRect(0, 0, S, S);
-  if (!src){
-    ctx.fillStyle = '#9A8A6C';
-    ctx.font = '28px "Noto Sans Thai", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('ยังไม่มีรูป', S/2, S/2 - 10);
-    ctx.font = '20px "Noto Sans Thai", sans-serif';
-    ctx.fillText('เลือกรูปด้านล่าง', S/2, S/2 + 24);
-    return;
-  }
-  const { sx, sy, sw } = computeSrcRect(src);
-  ctx.drawImage(src, sx, sy, sw, sw, 0, 0, S, S);
-  if (withPins && curMaster && curMaster.pins){
-    curMaster.pins.forEach((p, i) => {
-      const px = (p.x*src.width - sx) / sw * S;
-      const py = (p.y*src.height - sy) / sw * S;
-      if (px < -20 || px > S+20 || py < -20 || py > S+20) return;
-      ctx.beginPath();
-      ctx.arc(px, py, 16, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(217,164,65,.92)';
-      ctx.fill();
-      ctx.lineWidth = 3; ctx.strokeStyle = '#1A1206'; ctx.stroke();
-      ctx.fillStyle = '#1A1206';
-      ctx.font = 'bold 17px "Noto Sans Thai", sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(String(i+1), px, py+1);
-    });
-  }
-  // วงกลมเน้นตำหนิ — วาดบนทั้งสองภาพที่ตำแหน่ง/ขนาดสัดส่วนเดียวกันเสมอ
-  const c = circleDraft || focusCircle;
-  if (c){
-    const px = (c.nx*src.width - sx) / sw * S;
-    const py = (c.ny*src.height - sy) / sw * S;
-    const pr = c.nr * src.width / sw * S;
-    const color = circleDraft
-      ? 'rgba(217,164,65,.95)'
-      : (lastCirclePct == null ? 'rgba(217,164,65,.95)'
-         : lastCirclePct >= 70 ? 'rgba(143,188,90,.95)' : 'rgba(208,106,86,.95)');
-    ctx.beginPath();
-    ctx.arc(px, py, Math.max(6, pr), 0, Math.PI*2);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = color;
-    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-}
-function redraw(){
-  if (wsMode === 'dual' || wsMode === 'pins'){
-    drawInto($('cvMaster'), masterCrop, wsMode === 'pins');
-    drawInto($('cvSuspect'), suspectCrop, false);
-  }
-  if (wsMode === 'overlay'){
-    const cv = $('ovCanvas'), ctx = cv.getContext('2d'), S = cv.width;
-    ctx.fillStyle = '#141008'; ctx.fillRect(0, 0, S, S);
-    const base = suspectCrop || masterCrop;
-    if (base){
-      const r1 = computeSrcRect(base);
-      ctx.globalAlpha = 1;
-      ctx.drawImage(base, r1.sx, r1.sy, r1.sw, r1.sw, 0, 0, S, S);
-    }
-    if (suspectCrop && masterCrop){
-      const r2 = computeSrcRect(masterCrop);
-      ctx.globalAlpha = opacity;
-      ctx.drawImage(masterCrop, r2.sx, r2.sy, r2.sw, r2.sw, 0, 0, S, S);
-      ctx.globalAlpha = 1;
-    }
-  }
-}
+document.getElementById('btnSaveCaptureSymbol').onclick = async ()=>{
+  if(!captureCropRect) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.round(captureCropRect.w); tmp.height = Math.round(captureCropRect.h);
+  tmp.getContext('2d').drawImage(captureCanvas, captureCropRect.x, captureCropRect.y, captureCropRect.w, captureCropRect.h, 0,0, tmp.width, tmp.height);
+  const dataURL = tmp.toDataURL('image/png');
+  closeCaptureModal();
+  await addSymbolFromDataURL(dataURL, tmp.width, tmp.height);
+};
 
-/* ---------- ลากเลื่อน + แตะเพิ่มหมุด + กดค้างเทียบเฉพาะจุด ---------- */
-function bindPan(cv, isMaster){
-  let dragging = false, moved = 0, lastX = 0, lastY = 0;
-  let pressTimer = null, longFired = false, startCX = 0, startCY = 0;
-  const LONG_MS = 480, MOVE_TOL = 10;
-
-  function fracOnSrc(e, src){
-    const rect = cv.getBoundingClientRect();
-    const { sx, sy, sw } = computeSrcRect(src);
-    const ox = (e.clientX - rect.left) / rect.width;
-    const oy = (e.clientY - rect.top) / rect.height;
-    return { nx: (sx + ox*sw) / src.width, ny: (sy + oy*sw) / src.height };
-  }
-
-  cv.addEventListener('pointerdown', e => {
-    // โหมดวาดวงกลมเน้นตำหนิ: ลากจากจุดศูนย์กลางออกไปเพื่อกำหนดรัศมี (ใช้แทนการเลื่อนภาพชั่วคราว)
-    if (circleMode && wsMode === 'dual'){
-      const src = isMaster ? masterCrop : (suspectCrop || masterCrop);
-      if (!src) return;
-      const { nx, ny } = fracOnSrc(e, src);
-      circleDraft = { nx, ny, nr: 0.02 };
-      cv.setPointerCapture(e.pointerId);
-      redraw();
-      return;
-    }
-    dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
-    startCX = e.clientX; startCY = e.clientY;
-    longFired = false;
-    cv.setPointerCapture(e.pointerId);
-    if ((wsMode === 'dual' || wsMode === 'pins')){
-      clearTimeout(pressTimer);
-      pressTimer = setTimeout(() => {
-        if (moved < MOVE_TOL){
-          longFired = true;
-          const rect = cv.getBoundingClientRect();
-          const ox = (startCX - rect.left) / rect.width;
-          const oy = (startCY - rect.top) / rect.height;
-          handleLongPress(isMaster, ox, oy);
-        }
-      }, LONG_MS);
-    }
-  });
-  cv.addEventListener('pointermove', e => {
-    if (circleMode && circleDraft){
-      const src = isMaster ? masterCrop : (suspectCrop || masterCrop);
-      if (!src) return;
-      const { nx, ny } = fracOnSrc(e, src);
-      const dx = nx - circleDraft.nx, dy = ny - circleDraft.ny;
-      circleDraft.nr = Math.max(0.015, Math.sqrt(dx*dx + dy*dy));
-      redraw();
-      return;
-    }
-    if (!dragging) return;
-    const dx = e.clientX - lastX, dy = e.clientY - lastY;
-    moved += Math.abs(dx) + Math.abs(dy);
-    lastX = e.clientX; lastY = e.clientY;
-    if (moved >= MOVE_TOL) clearTimeout(pressTimer);
-    const src = isMaster ? masterCrop : (suspectCrop || masterCrop);
-    if (!src) return;
-    const rect = cv.getBoundingClientRect();
-    const sw = src.width / view.z;
-    view.cx -= dx / rect.width * sw / src.width;
-    view.cy -= dy / rect.height * sw / src.height;
-    const half = 0.5 / view.z;
-    view.cx = Math.max(half, Math.min(1-half, view.cx));
-    view.cy = Math.max(half, Math.min(1-half, view.cy));
-    redraw();
-  });
-  cv.addEventListener('pointerup', async e => {
-    // จบการวาดวงกลมเน้นตำหนิ
-    if (circleMode){
-      if (circleDraft && circleDraft.nr > 0.015){
-        focusCircle = { nx: circleDraft.nx, ny: circleDraft.ny, nr: circleDraft.nr };
-        lastCirclePct = null;
-        redraw();
-        await focusOnCircle();
-      }
-      circleDraft = null;
-      redraw();
-      return;
-    }
-    dragging = false;
-    clearTimeout(pressTimer);
-    if (longFired){ longFired = false; return; }   // กดค้างจัดการไปแล้ว ไม่ต้องแตะซ้ำ
-
-    // แตะเบาๆ (ไม่ได้ลาก) ในแท็บ "เทียบคู่" = ซูมเทียบจุดนั้นทันที ไม่ต้องกดค้าง (ฝั่งไหนก็ได้)
-    if (moved < 8 && wsMode === 'dual' && masterCrop){
-      const rect = cv.getBoundingClientRect();
-      const ox = (e.clientX - rect.left) / rect.width;
-      const oy = (e.clientY - rect.top) / rect.height;
-      handleLongPress(isMaster, ox, oy);
-      return;
-    }
-    // แตะเบาๆ (ไม่ได้ลาก) บนรูปองค์ครูขณะอยู่ในโหมดเพิ่มหมุด = ปักหมุด
-    if (moved < 8 && isMaster && wsMode === 'pins' && masterCrop && curMaster){
-      const rect = cv.getBoundingClientRect();
-      const ox = (e.clientX - rect.left) / rect.width;
-      const oy = (e.clientY - rect.top) / rect.height;
-      const { sx, sy, sw } = computeSrcRect(masterCrop);
-      const nx = (sx + ox*sw) / masterCrop.width;
-      const ny = (sy + oy*sw) / masterCrop.height;
-      if (addingPin){
-        const label = await askText('ตำหนิจุดนี้คืออะไร (เช่น เนื้อเกินใต้ฐาน, รอยบล็อกแตกที่ซุ้ม)', '');
-        if (label !== null && label.trim()){
-          curMaster.pins = curMaster.pins || [];
-          curMaster.pins.push({ x: nx, y: ny, label: label.trim() });
-          idbPut(curMaster);
-          renderPinsPanel(); renderMasters(); redraw();
-        }
-        addingPin = false;
-        $('addPinBtn').textContent = '➕ เพิ่มหมุดตำหนิ (กดแล้วแตะจุดบนรูปองค์ครู)';
-      } else {
-        // แตะใกล้หมุดเดิม = ถามลบ
-        const hit = (curMaster.pins||[]).findIndex(p => {
-          const px = (p.x*masterCrop.width - sx) / sw;
-          const py = (p.y*masterCrop.height - sy) / sw;
-          return Math.hypot(px-ox, py-oy) < 0.05;
-        });
-        if (hit >= 0 && confirm(`ลบหมุดที่ ${hit+1}: "${curMaster.pins[hit].label}" ?`)){
-          curMaster.pins.splice(hit, 1);
-          delete checks[hit];
-          idbPut(curMaster);
-          renderPinsPanel(); renderMasters(); redraw();
-        }
-      }
-    }
-  });
-}
-bindPan($('cvMaster'), true);
-bindPan($('cvSuspect'), false);
-bindPan($('ovCanvas'), false);
-
-/* กดค้าง: ครอปโฟกัสจุดที่แตะจากทั้งสองภาพ + คำนวณ % ความใกล้เคียงเฉพาะจุด */
-function handleLongPress(isMasterSide, ox, oy){
-  if (!masterCrop) return;
-  const srcForSide = isMasterSide ? masterCrop : (suspectCrop || masterCrop);
-  const { sx, sy, sw } = computeSrcRect(srcForSide);
-  const nx = (sx + ox*sw) / srcForSide.width;
-  const ny = (sy + oy*sw) / srcForSide.height;
-  focusOnPoint(nx, ny);
-}
-function cropFocusPatch(src, nx, ny){
-  const FRAC = 0.22;                       // สัดส่วนพื้นที่รอบจุดที่โฟกัส
-  const s = Math.min(src.width, src.height);
-  const size = s * FRAC;
-  let px = nx*src.width - size/2, py = ny*src.height - size/2;
-  px = Math.max(0, Math.min(src.width-size, px));
-  py = Math.max(0, Math.min(src.height-size, py));
-  const out = document.createElement('canvas');
-  out.width = 224; out.height = 224;
-  out.getContext('2d').drawImage(src, px, py, size, size, 0, 0, 224, 224);
-  return out;
-}
-/* ปรับสมดุลแสง/สีของแพทช์ให้อยู่ในมาตรฐานเดียวกัน (ทำแยกทีละช่องสี R,G,B)
-   เพื่อลดผลจากแสงคนละแหล่ง/คนละโทนตอนถ่ายภาพ ก่อนเทียบรอย/เนื้อเกิน */
-function normalizeLighting(src){
-  const w = src.width, h = src.height;
-  const out = document.createElement('canvas'); out.width = w; out.height = h;
-  const octx = out.getContext('2d');
-  octx.drawImage(src, 0, 0);
-  const imgData = octx.getImageData(0, 0, w, h);
-  const d = imgData.data;
-  const n = d.length/4;
-  const targetMean = 128, targetStd = 48;
-  for (let c = 0; c < 3; c++){
-    let sum = 0, sumSq = 0;
-    for (let i = c; i < d.length; i += 4){ sum += d[i]; sumSq += d[i]*d[i]; }
-    const mean = sum/n;
-    const std = Math.sqrt(Math.max(sumSq/n - mean*mean, 1));
-    const scale = targetStd/std;
-    for (let i = c; i < d.length; i += 4){
-      d[i] = Math.max(0, Math.min(255, (d[i]-mean)*scale + targetMean));
-    }
-  }
-  octx.putImageData(imgData, 0, 0);
-  return out;
-}
-async function focusOnPoint(nx, ny){
-  if (!masterCrop) return;
-  $('focusPanel').style.display = 'block';
-  const mPatchRaw = cropFocusPatch(masterCrop, nx, ny);
-  const mPatch = normalizeLighting(mPatchRaw);
-  $('cvFocusMaster').getContext('2d').drawImage(mPatch, 0, 0, 320, 320);
-  if (!suspectCrop){
-    $('cvFocusSuspect').getContext('2d').clearRect(0, 0, 320, 320);
-    $('focusPct').textContent = '–';
-    $('focusPct').style.color = 'var(--muted)';
-    return;
-  }
-  const sPatchRaw = cropFocusPatch(suspectCrop, nx, ny);
-  const sPatch = normalizeLighting(sPatchRaw);
-  $('cvFocusSuspect').getContext('2d').drawImage(sPatch, 0, 0, 320, 320);
-  try {
-    await ensureNet();
-    const v1 = await embed(mPatch);
-    const v2 = await embed(sPatch);
-    const c = cosine(v1, v2);
-    const pct = shapeToPct(c);
-    $('focusPct').textContent = isFinite(pct) ? pct + '%' : '–';
-    $('focusPct').style.color = pct >= 70 ? 'var(--high)' : 'var(--low)';
-  } catch(e){
-    $('focusPct').textContent = '–';
-    $('focusPct').style.color = 'var(--muted)';
-  }
-}
-
-/* ครอปพื้นที่รอบวงกลมที่ผู้ใช้วาดเอง (ขนาดผันตามรัศมีวง เผื่อบริบทรอบวงไว้ด้วย) */
-function cropFocusPatchSized(src, nx, ny, nr){
-  const s = Math.min(src.width, src.height);
-  const size = Math.max(s*0.10, Math.min(s, nr*s*2*2.6));
-  let px = nx*src.width - size/2, py = ny*src.height - size/2;
-  px = Math.max(0, Math.min(src.width-size, px));
-  py = Math.max(0, Math.min(src.height-size, py));
-  const out = document.createElement('canvas');
-  out.width = 224; out.height = 224;
-  out.getContext('2d').drawImage(src, px, py, size, size, 0, 0, 224, 224);
-  return out;
-}
-/* เทียบเฉพาะจุดที่วงกลมไว้ — ทำงานเหมือน focusOnPoint แต่ขนาดพื้นที่ผันตามวงที่วาด
-   และอัปเดตสีของวงกลม (เขียว/แดง) ตามผลที่ได้ */
-async function focusOnCircle(){
-  if (!masterCrop || !focusCircle) return;
-  const { nx, ny, nr } = focusCircle;
-  $('focusPanel').style.display = 'block';
-  const mPatchRaw = cropFocusPatchSized(masterCrop, nx, ny, nr);
-  const mPatch = normalizeLighting(mPatchRaw);
-  $('cvFocusMaster').getContext('2d').drawImage(mPatch, 0, 0, 320, 320);
-  if (!suspectCrop){
-    $('cvFocusSuspect').getContext('2d').clearRect(0, 0, 320, 320);
-    $('focusPct').textContent = '–';
-    $('focusPct').style.color = 'var(--muted)';
-    lastCirclePct = null;
-    redraw();
-    return;
-  }
-  const sPatchRaw = cropFocusPatchSized(suspectCrop, nx, ny, nr);
-  const sPatch = normalizeLighting(sPatchRaw);
-  $('cvFocusSuspect').getContext('2d').drawImage(sPatch, 0, 0, 320, 320);
-  try {
-    await ensureNet();
-    const v1 = await embed(mPatch);
-    const v2 = await embed(sPatch);
-    const pct = shapeToPct(cosine(v1, v2));
-    $('focusPct').textContent = isFinite(pct) ? pct + '%' : '–';
-    $('focusPct').style.color = pct >= 70 ? 'var(--high)' : 'var(--low)';
-    lastCirclePct = isFinite(pct) ? pct : null;
-  } catch(e){
-    $('focusPct').textContent = '–';
-    $('focusPct').style.color = 'var(--muted)';
-    lastCirclePct = null;
-  }
-  redraw();
-}
-
-$('addPinBtn').addEventListener('click', () => {
-  addingPin = !addingPin;
-  $('addPinBtn').textContent = addingPin
-    ? '👉 แตะจุดตำหนิบนรูปองค์ครูได้เลย (กดอีกทีเพื่อยกเลิก)'
-    : '➕ เพิ่มหมุดตำหนิ (กดแล้วแตะจุดบนรูปองค์ครู)';
+/* ============ Init ============ */
+openDB().then(async ()=>{
+  await refreshLibraryUI();
+  await refreshPriceListUI();
 });
-
-/* เช็คลิสต์หมุดตำหนิ */
-function renderPinsPanel(){
-  const list = $('pinList'); list.innerHTML = '';
-  const pins = (curMaster && curMaster.pins) || [];
-  pins.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'pinrow';
-    row.innerHTML = `<span class="no">${i+1}</span><span class="lb">${escapeHtml(p.label)}</span>`;
-    const bOk = document.createElement('button');
-    bOk.textContent = 'ตรง';
-    bOk.className = 'ok' + (checks[i]==='ok' ? ' sel-ok' : '');
-    const bNo = document.createElement('button');
-    bNo.textContent = 'ไม่ตรง';
-    bNo.className = 'no2' + (checks[i]==='no' ? ' sel-no' : '');
-    bOk.addEventListener('click', () => { checks[i] = checks[i]==='ok' ? undefined : 'ok'; renderPinsPanel(); });
-    bNo.addEventListener('click', () => { checks[i] = checks[i]==='no' ? undefined : 'no'; renderPinsPanel(); });
-    row.appendChild(bOk); row.appendChild(bNo);
-    list.appendChild(row);
-  });
-  const ok = Object.values(checks).filter(x => x==='ok').length;
-  const no = Object.values(checks).filter(x => x==='no').length;
-  $('pinSummary').innerHTML = pins.length
-    ? `เช็คแล้ว <b style="color:var(--high)">ตรง ${ok}</b> · <b style="color:var(--low)">ไม่ตรง ${no}</b> จากทั้งหมด ${pins.length} จุด`
-    : 'ยังไม่มีหมุดตำหนิ — กดปุ่มด้านบนแล้วแตะจุดสำคัญบนรูปองค์ครู';
-}
-
-/* ============ เริ่มต้น ============ */
-(async () => {
-  await openIDB();
-  await loadMasters();
-  await loadDB();
-})();
 </script>
 </body>
 </html>
