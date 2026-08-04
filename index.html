@@ -277,6 +277,8 @@
   .modalBtns{display:flex;gap:10px;margin-top:14px}
   .modalBtns .btn{margin-top:0;flex:1}
 
+  #circleModeBtn.active{background:var(--gold);color:#1A1206;border-color:var(--gold);font-weight:700}
+
   .helpcard h2{
     font-family:'Pridi',serif;color:var(--gold);font-size:1.35rem;font-weight:600;
     margin-bottom:4px;
@@ -433,6 +435,11 @@
   </div>
   <p class="hint" style="text-align:center;margin:-4px 0 0"><b>แท็บเทียบคู่:</b> คลิก/แตะจุดที่สงสัยบนรูปฝั่งไหนก็ได้ ซูมเทียบทันที · <b>แท็บหมุดตำหนิ:</b> กดค้างเพื่อซูมเทียบจุด (คลิกเดียวไว้ปักหมุด)</p>
 
+  <div id="circleModeRow" style="display:flex;gap:8px;width:100%;margin-top:8px">
+    <button class="btn secondary" id="circleModeBtn" style="margin-top:0;flex:1">🎯 วาดวงกลมเน้นตำหนิ</button>
+    <button class="btn secondary" id="circleClearBtn" style="margin-top:0;display:none;flex:0 0 auto">✕ ล้างวง</button>
+  </div>
+
   <div class="dual" id="dualWrap">
     <div class="col">
       <canvas id="cvMaster" width="600" height="600"></canvas>
@@ -535,6 +542,7 @@
       <li><b>หมุดตำหนิ</b> — กด "➕ เพิ่มหมุดตำหนิ" แล้วแตะจุดบนรูปองค์ครู ตั้งชื่อจุด จากนั้นเช็คทีละจุดว่า "ตรง/ไม่ตรง" ได้</li>
     </ul>
     <p><b>ในแท็บ "เทียบคู่"</b> คลิก/แตะจุดที่สงสัยบนรูปฝั่งไหนก็ได้ครั้งเดียว ระบบจะซูมเฉพาะจุดนั้นของทั้งสองภาพ ปรับความสว่าง/โทนสีและสเกลขนาดให้ใกล้เคียงกันก่อนอัตโนมัติ แล้วคำนวณ <b>% ความใกล้เคียงเฉพาะจุด</b> ให้ทันที (ในแท็บ "หมุดตำหนิ" ต้องกดค้างแทน เพราะคลิกเดียวถูกใช้สำหรับปักหมุด)</p>
+    <p>อยากเน้นตำแหน่งตำหนิให้ชัดกว่าจุดเดียว กด <b>"🎯 วาดวงกลมเน้นตำหนิ"</b> แล้วลากบนรูปฝั่งไหนก็ได้จากจุดศูนย์กลางออกไปเป็นวงกลม ระบบจะวาดวงเดียวกันซ้อนบนทั้งสองภาพให้อัตโนมัติ พร้อมคำนวณ % เฉพาะพื้นที่ในวงนั้น วงจะเปลี่ยนเป็นสีเขียว/แดงตามผล กด "✕ ล้างวง" เพื่อลบแล้ววงใหม่ได้</p>
     <p>ไม่มีรูปองค์ที่ตรวจสอบ? กด <b>"เลือกรูปองค์ที่ตรวจสอบ"</b> อัปโหลดรูปที่ถ่ายด้วยกล้องปกติ หรือรูปที่แคปหน้าจอมาได้เลย</p>
 
     <h3>5. เกณฑ์ราคาและสี</h3>
@@ -1502,6 +1510,10 @@ let wsMode = 'dual';
 let opacity = 0.5;
 let addingPin = false;
 let checks = {};          // index หมุด -> 'ok' | 'no'
+let circleMode = false;   // true = กำลังลากวาดวงกลมเน้นตำหนิ (แทนการเลื่อนภาพ)
+let circleDraft = null;   // วงที่กำลังลากอยู่ {nx,ny,nr}
+let focusCircle = null;   // วงที่วาดเสร็จแล้ว {nx,ny,nr}
+let lastCirclePct = null; // % ล่าสุดของวงที่วาด (ไว้กำหนดสีวง)
 
 async function openWorkspace(m){
   curMaster = m;
@@ -1512,10 +1524,12 @@ async function openWorkspace(m){
   if (suspectCrop === sessionSuspect) suspectVec = sessionSuspectVec;
   view = { z: 1, cx: 0.5, cy: 0.5 };
   wsMode = 'dual'; opacity = 0.5; addingPin = false; checks = {};
+  circleMode = false; circleDraft = null; focusCircle = null; lastCirclePct = null;
   $('wsZoom').value = 1; $('wsZoomVal').textContent = '1.0x';
   $('opSlider').value = 50; $('opVal').textContent = '50%';
   $('useCapBtn').style.display = sessionSuspect ? 'block' : 'none';
   $('focusPanel').style.display = 'none';
+  updateCircleModeBtn();
   setMode('dual');
   showPage('pgCompare');
   $('status').textContent = suspectCrop ? '' : 'ยังไม่มีรูปองค์ที่ตรวจสอบ — กดปุ่มด้านล่างเพื่อเลือกรูป หรือกลับไปถ่ายจากหน้าส่อง';
@@ -1556,11 +1570,32 @@ function setMode(m){
   $('dualWrap').style.display = (m==='dual' || m==='pins') ? 'flex' : 'none';
   $('ovWrap').style.display = m==='overlay' ? 'block' : 'none';
   $('pinPanel').style.display = m==='pins' ? 'block' : 'none';
+  $('circleModeRow').style.display = m==='dual' ? 'flex' : 'none';
   if (m === 'overlay') $('focusPanel').style.display = 'none';
+  if (m !== 'dual'){ circleMode = false; circleDraft = null; updateCircleModeBtn(); }
   addingPin = false;
   $('addPinBtn').textContent = '➕ เพิ่มหมุดตำหนิ (กดแล้วแตะจุดบนรูปองค์ครู)';
   redraw();
 }
+
+/* ปุ่มโหมดวาดวงกลมเน้นตำหนิ */
+function updateCircleModeBtn(){
+  const btn = $('circleModeBtn');
+  btn.classList.toggle('active', circleMode);
+  btn.textContent = circleMode ? '🎯 กำลังวาดวง — ลากบนรูปเพื่อวง (แตะซ้ำเพื่อปิด)' : '🎯 วาดวงกลมเน้นตำหนิ';
+  $('circleClearBtn').style.display = focusCircle ? 'block' : 'none';
+}
+$('circleModeBtn').addEventListener('click', () => {
+  circleMode = !circleMode;
+  circleDraft = null;
+  updateCircleModeBtn();
+});
+$('circleClearBtn').addEventListener('click', () => {
+  focusCircle = null; circleDraft = null; lastCirclePct = null;
+  updateCircleModeBtn();
+  $('focusPanel').style.display = 'none';
+  redraw();
+});
 
 /* ซูม/ความเข้ม */
 $('wsZoom').addEventListener('input', () => {
@@ -1652,6 +1687,24 @@ function drawInto(cv, src, withPins){
       ctx.fillText(String(i+1), px, py+1);
     });
   }
+  // วงกลมเน้นตำหนิ — วาดบนทั้งสองภาพที่ตำแหน่ง/ขนาดสัดส่วนเดียวกันเสมอ
+  const c = circleDraft || focusCircle;
+  if (c){
+    const px = (c.nx*src.width - sx) / sw * S;
+    const py = (c.ny*src.height - sy) / sw * S;
+    const pr = c.nr * src.width / sw * S;
+    const color = circleDraft
+      ? 'rgba(217,164,65,.95)'
+      : (lastCirclePct == null ? 'rgba(217,164,65,.95)'
+         : lastCirclePct >= 70 ? 'rgba(143,188,90,.95)' : 'rgba(208,106,86,.95)');
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(6, pr), 0, Math.PI*2);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 4;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
 }
 function redraw(){
   if (wsMode === 'dual' || wsMode === 'pins'){
@@ -1682,7 +1735,25 @@ function bindPan(cv, isMaster){
   let pressTimer = null, longFired = false, startCX = 0, startCY = 0;
   const LONG_MS = 480, MOVE_TOL = 10;
 
+  function fracOnSrc(e, src){
+    const rect = cv.getBoundingClientRect();
+    const { sx, sy, sw } = computeSrcRect(src);
+    const ox = (e.clientX - rect.left) / rect.width;
+    const oy = (e.clientY - rect.top) / rect.height;
+    return { nx: (sx + ox*sw) / src.width, ny: (sy + oy*sw) / src.height };
+  }
+
   cv.addEventListener('pointerdown', e => {
+    // โหมดวาดวงกลมเน้นตำหนิ: ลากจากจุดศูนย์กลางออกไปเพื่อกำหนดรัศมี (ใช้แทนการเลื่อนภาพชั่วคราว)
+    if (circleMode && wsMode === 'dual'){
+      const src = isMaster ? masterCrop : (suspectCrop || masterCrop);
+      if (!src) return;
+      const { nx, ny } = fracOnSrc(e, src);
+      circleDraft = { nx, ny, nr: 0.02 };
+      cv.setPointerCapture(e.pointerId);
+      redraw();
+      return;
+    }
     dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
     startCX = e.clientX; startCY = e.clientY;
     longFired = false;
@@ -1701,6 +1772,15 @@ function bindPan(cv, isMaster){
     }
   });
   cv.addEventListener('pointermove', e => {
+    if (circleMode && circleDraft){
+      const src = isMaster ? masterCrop : (suspectCrop || masterCrop);
+      if (!src) return;
+      const { nx, ny } = fracOnSrc(e, src);
+      const dx = nx - circleDraft.nx, dy = ny - circleDraft.ny;
+      circleDraft.nr = Math.max(0.015, Math.sqrt(dx*dx + dy*dy));
+      redraw();
+      return;
+    }
     if (!dragging) return;
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     moved += Math.abs(dx) + Math.abs(dy);
@@ -1718,6 +1798,18 @@ function bindPan(cv, isMaster){
     redraw();
   });
   cv.addEventListener('pointerup', async e => {
+    // จบการวาดวงกลมเน้นตำหนิ
+    if (circleMode){
+      if (circleDraft && circleDraft.nr > 0.015){
+        focusCircle = { nx: circleDraft.nx, ny: circleDraft.ny, nr: circleDraft.nr };
+        lastCirclePct = null;
+        redraw();
+        await focusOnCircle();
+      }
+      circleDraft = null;
+      redraw();
+      return;
+    }
     dragging = false;
     clearTimeout(pressTimer);
     if (longFired){ longFired = false; return; }   // กดค้างจัดการไปแล้ว ไม่ต้องแตะซ้ำ
@@ -1841,6 +1933,54 @@ async function focusOnPoint(nx, ny){
     $('focusPct').textContent = '–';
     $('focusPct').style.color = 'var(--muted)';
   }
+}
+
+/* ครอปพื้นที่รอบวงกลมที่ผู้ใช้วาดเอง (ขนาดผันตามรัศมีวง เผื่อบริบทรอบวงไว้ด้วย) */
+function cropFocusPatchSized(src, nx, ny, nr){
+  const s = Math.min(src.width, src.height);
+  const size = Math.max(s*0.10, Math.min(s, nr*s*2*2.6));
+  let px = nx*src.width - size/2, py = ny*src.height - size/2;
+  px = Math.max(0, Math.min(src.width-size, px));
+  py = Math.max(0, Math.min(src.height-size, py));
+  const out = document.createElement('canvas');
+  out.width = 224; out.height = 224;
+  out.getContext('2d').drawImage(src, px, py, size, size, 0, 0, 224, 224);
+  return out;
+}
+/* เทียบเฉพาะจุดที่วงกลมไว้ — ทำงานเหมือน focusOnPoint แต่ขนาดพื้นที่ผันตามวงที่วาด
+   และอัปเดตสีของวงกลม (เขียว/แดง) ตามผลที่ได้ */
+async function focusOnCircle(){
+  if (!masterCrop || !focusCircle) return;
+  const { nx, ny, nr } = focusCircle;
+  $('focusPanel').style.display = 'block';
+  const mPatchRaw = cropFocusPatchSized(masterCrop, nx, ny, nr);
+  const mPatch = normalizeLighting(mPatchRaw);
+  $('cvFocusMaster').getContext('2d').drawImage(mPatch, 0, 0, 320, 320);
+  if (!suspectCrop){
+    $('cvFocusSuspect').getContext('2d').clearRect(0, 0, 320, 320);
+    $('focusPct').textContent = '–';
+    $('focusPct').style.color = 'var(--muted)';
+    lastCirclePct = null;
+    redraw();
+    return;
+  }
+  const sPatchRaw = cropFocusPatchSized(suspectCrop, nx, ny, nr);
+  const sPatch = normalizeLighting(sPatchRaw);
+  $('cvFocusSuspect').getContext('2d').drawImage(sPatch, 0, 0, 320, 320);
+  try {
+    await ensureNet();
+    const v1 = await embed(mPatch);
+    const v2 = await embed(sPatch);
+    const pct = shapeToPct(cosine(v1, v2));
+    $('focusPct').textContent = isFinite(pct) ? pct + '%' : '–';
+    $('focusPct').style.color = pct >= 70 ? 'var(--high)' : 'var(--low)';
+    lastCirclePct = isFinite(pct) ? pct : null;
+  } catch(e){
+    $('focusPct').textContent = '–';
+    $('focusPct').style.color = 'var(--muted)';
+    lastCirclePct = null;
+  }
+  redraw();
 }
 
 $('addPinBtn').addEventListener('click', () => {
