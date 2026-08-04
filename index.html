@@ -62,6 +62,8 @@
 #previewTableWrap table{width:100%;border-collapse:collapse;font-size:11px;}
 #previewTableWrap th,#previewTableWrap td{padding:4px 6px;border-bottom:1px solid var(--border);white-space:nowrap;}
 #previewTableWrap th{color:var(--accent);position:sticky;top:0;background:var(--panel2);}
+#captureStageWrap canvas{max-width:100%;display:block;}
+#captureCropOverlay{position:absolute;top:0;left:0;cursor:crosshair;}
 </style>
 </head>
 <body>
@@ -97,6 +99,7 @@
     <div class="hint">เพิ่มสัญลักษณ์ได้ 2 ทาง: (1) ลากเลือกกรอบจากภาพแบบแปลนที่แสดงอยู่ตรงกลาง หรือ (2) อัปโหลดไฟล์รูปสัญลักษณ์โดยตรง</div>
     <button class="secondary needs-cv" id="btnUploadSymbol" disabled style="margin-top:10px;width:100%;">➕ อัปโหลดรูปสัญลักษณ์</button>
     <input type="file" id="fileSymbolUpload" accept="image/*" style="display:none;">
+    <button class="secondary" id="btnCaptureSymbol" style="margin-top:8px;width:100%;">📸 แคปหน้าจอเพื่อเพิ่มสัญลักษณ์</button>
     <div class="divider"></div>
     <div id="libraryList"><div class="empty">ยังไม่มีสัญลักษณ์ในฐานข้อมูล</div></div>
   </div>
@@ -226,6 +229,23 @@
   </div>
 </div>
 
+<!-- Screen-capture-to-symbol modal -->
+<div class="modal-overlay" id="captureModalOverlay">
+  <div class="modal-box" style="width:680px;">
+    <h3>📸 แคปหน้าจอเพื่อเพิ่มสัญลักษณ์</h3>
+    <div class="hint">กดแคปแล้วเลือกหน้าต่าง/หน้าจอที่มีสัญลักษณ์อยู่ จากนั้นลากเลือกกรอบสัญลักษณ์บนภาพด้านล่าง แล้วกด "บันทึก"</div>
+    <div id="captureStageWrap" style="position:relative;width:100%;background:#000;border-radius:8px;overflow:auto;margin-top:10px;min-height:220px;display:flex;align-items:center;justify-content:center;">
+      <canvas id="captureCanvas"></canvas>
+      <canvas id="captureCropOverlay"></canvas>
+      <div class="empty" id="captureEmpty">กำลังขอสิทธิ์แชร์หน้าจอ...</div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button class="secondary" id="btnRecapture">🔄 แคปใหม่</button>
+      <button id="btnSaveCaptureSymbol" disabled style="flex:1;">💾 บันทึกเป็นสัญลักษณ์ใหม่</button>
+      <button class="secondary" id="btnCloseCaptureModal">✖ ปิด</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ============ IndexedDB storage (private, local-only) ============ */
@@ -931,6 +951,84 @@ async function refreshPriceListUI(){
     clearBtn.style.display='none';
   }
 }
+
+/* ============ Screen-capture-to-symbol (independent of the main plan stage) ============ */
+const captureModalOverlay = document.getElementById('captureModalOverlay');
+const captureCanvas = document.getElementById('captureCanvas');
+const captureCropOverlay = document.getElementById('captureCropOverlay');
+const captureEmpty = document.getElementById('captureEmpty');
+let captureCropStart = null, captureCropRect = null;
+
+document.getElementById('btnCaptureSymbol').onclick = async ()=>{
+  captureModalOverlay.style.display = 'flex';
+  await doScreenCaptureForSymbol();
+};
+document.getElementById('btnRecapture').onclick = doScreenCaptureForSymbol;
+document.getElementById('btnCloseCaptureModal').onclick = closeCaptureModal;
+
+function closeCaptureModal(){
+  captureModalOverlay.style.display = 'none';
+  captureCropRect = null; captureCropStart = null;
+  document.getElementById('btnSaveCaptureSymbol').disabled = true;
+  captureCropOverlay.getContext('2d').clearRect(0,0,captureCropOverlay.width,captureCropOverlay.height);
+}
+
+async function doScreenCaptureForSymbol(){
+  captureEmpty.style.display = 'block';
+  captureEmpty.textContent = 'กำลังขอสิทธิ์แชร์หน้าจอ...';
+  document.getElementById('btnSaveCaptureSymbol').disabled = true;
+  captureCropRect = null;
+  try{
+    const s = await navigator.mediaDevices.getDisplayMedia({video:{cursor:'never'}, audio:false});
+    const tempVideo = document.createElement('video');
+    tempVideo.muted = true;
+    tempVideo.srcObject = s;
+    await tempVideo.play();
+    await new Promise(r=>setTimeout(r,150)); // let the first real frame render
+    captureCanvas.width = tempVideo.videoWidth;
+    captureCanvas.height = tempVideo.videoHeight;
+    captureCanvas.getContext('2d').drawImage(tempVideo,0,0);
+    captureCropOverlay.width = tempVideo.videoWidth;
+    captureCropOverlay.height = tempVideo.videoHeight;
+    captureCropOverlay.getContext('2d').clearRect(0,0,captureCropOverlay.width,captureCropOverlay.height);
+    s.getTracks().forEach(t=>t.stop()); // only needed a single snapshot
+    captureEmpty.style.display = 'none';
+  }catch(err){
+    captureEmpty.style.display = 'block';
+    captureEmpty.textContent = 'ไม่สามารถแคปหน้าจอได้: '+err.message;
+  }
+}
+
+captureCropOverlay.addEventListener('mousedown', e=>{
+  const rect = captureCropOverlay.getBoundingClientRect();
+  const scaleX = captureCropOverlay.width/rect.width, scaleY = captureCropOverlay.height/rect.height;
+  captureCropStart = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+});
+captureCropOverlay.addEventListener('mousemove', e=>{
+  if(!captureCropStart) return;
+  const rect = captureCropOverlay.getBoundingClientRect();
+  const scaleX = captureCropOverlay.width/rect.width, scaleY = captureCropOverlay.height/rect.height;
+  const cur = {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+  captureCropRect = { x:Math.min(captureCropStart.x,cur.x), y:Math.min(captureCropStart.y,cur.y), w:Math.abs(cur.x-captureCropStart.x), h:Math.abs(cur.y-captureCropStart.y) };
+  const ctx = captureCropOverlay.getContext('2d');
+  ctx.clearRect(0,0,captureCropOverlay.width,captureCropOverlay.height);
+  ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 2;
+  ctx.strokeRect(captureCropRect.x, captureCropRect.y, captureCropRect.w, captureCropRect.h);
+});
+captureCropOverlay.addEventListener('mouseup', ()=>{
+  captureCropStart = null;
+  document.getElementById('btnSaveCaptureSymbol').disabled = !(captureCropRect && captureCropRect.w>3 && captureCropRect.h>3);
+});
+
+document.getElementById('btnSaveCaptureSymbol').onclick = async ()=>{
+  if(!captureCropRect) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = Math.round(captureCropRect.w); tmp.height = Math.round(captureCropRect.h);
+  tmp.getContext('2d').drawImage(captureCanvas, captureCropRect.x, captureCropRect.y, captureCropRect.w, captureCropRect.h, 0,0, tmp.width, tmp.height);
+  const dataURL = tmp.toDataURL('image/png');
+  closeCaptureModal();
+  await addSymbolFromDataURL(dataURL, tmp.width, tmp.height);
+};
 
 /* ============ Init ============ */
 openDB().then(async ()=>{
