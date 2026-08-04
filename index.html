@@ -100,6 +100,8 @@
     <button class="secondary needs-cv" id="btnUploadSymbol" disabled style="margin-top:10px;width:100%;">➕ อัปโหลดรูปสัญลักษณ์</button>
     <input type="file" id="fileSymbolUpload" accept="image/*" style="display:none;">
     <button class="secondary" id="btnCaptureSymbol" style="margin-top:8px;width:100%;">📸 แคปหน้าจอเพื่อเพิ่มสัญลักษณ์</button>
+    <button class="secondary" id="btnBulkUpload" style="margin-top:8px;width:100%;">⚡ อัปโหลดหลายสัญลักษณ์พร้อมกัน</button>
+    <input type="file" id="fileBulkUpload" accept="image/*" multiple style="display:none;">
     <div class="divider"></div>
     <div id="libraryList"><div class="empty">ยังไม่มีสัญลักษณ์ในฐานข้อมูล</div></div>
   </div>
@@ -259,6 +261,19 @@
       <button class="secondary" id="btnRecapture">🔄 แคปใหม่</button>
       <button id="btnSaveCaptureSymbol" disabled style="flex:1;">💾 บันทึกเป็นสัญลักษณ์ใหม่จากกรอบที่ลากไว้</button>
       <button class="secondary" id="btnCloseCaptureModal">✖ ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk symbol upload modal -->
+<div class="modal-overlay" id="bulkModalOverlay">
+  <div class="modal-box" style="width:640px;">
+    <h3>⚡ เพิ่มสัญลักษณ์หลายตัวพร้อมกัน</h3>
+    <div class="hint">ตั้งรหัส/ชื่อแต่ละอันเอง หรือกด "🔗 ค้นหาจากตารางราคา" เพื่อผูกให้อัตโนมัติ แล้วกด "บันทึกทั้งหมด" ทีเดียว</div>
+    <div id="bulkList" style="margin-top:10px;max-height:55vh;overflow:auto;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button id="bulkSaveAll" style="flex:1;">💾 บันทึกทั้งหมด</button>
+      <button class="secondary" id="bulkCancel">✖ ยกเลิก</button>
     </div>
   </div>
 </div>
@@ -595,6 +610,113 @@ document.getElementById('fileSymbolUpload').onchange = (e)=>{
   };
   reader.readAsDataURL(file);
   e.target.value = '';
+};
+
+/* ============ Bulk symbol upload: add many symbol images at once ============ */
+let bulkPending = [];
+
+document.getElementById('btnBulkUpload').onclick = ()=> document.getElementById('fileBulkUpload').click();
+document.getElementById('fileBulkUpload').onchange = async (e)=>{
+  const files = Array.from(e.target.files||[]);
+  e.target.value = '';
+  if(files.length===0) return;
+  bulkPending = [];
+  for(const file of files){
+    const dataURL = await new Promise(res=>{
+      const r = new FileReader();
+      r.onload = ev=>res(ev.target.result);
+      r.readAsDataURL(file);
+    });
+    const img = await loadImage(dataURL);
+    const guess = file.name.replace(/\.[^.]+$/,''); // filename without extension as a name guess
+    bulkPending.push({dataURL, w:img.width, h:img.height, code:'', name:guess, linkedRow:null});
+  }
+  renderBulkList();
+  document.getElementById('bulkModalOverlay').style.display = 'flex';
+};
+
+function renderBulkList(){
+  const wrap = document.getElementById('bulkList');
+  if(bulkPending.length===0){ wrap.innerHTML = '<div class="empty">ไม่มีไฟล์ที่เลือก</div>'; return; }
+  wrap.innerHTML = bulkPending.map((item,idx)=>`
+    <div class="symbol-item" style="align-items:flex-start;margin-bottom:10px;">
+      <img src="${item.dataURL}">
+      <div class="symbol-info" style="flex:1;">
+        <input type="text" class="bulk-code" data-idx="${idx}" placeholder="รหัส (จำเป็น)" value="${item.code}" style="margin-top:0;">
+        <input type="text" class="bulk-name" data-idx="${idx}" placeholder="ชื่อ" value="${item.name}" style="margin-top:4px;">
+        ${item.linkedRow ? `<div style="font-size:11px;color:var(--good);margin-top:4px;">✅ ผูกกับ: ${item.linkedRow.code} ${item.linkedRow.name}</div>` : `<button class="secondary bulk-link" data-idx="${idx}" style="margin-top:4px;font-size:11px;padding:3px 8px;">🔗 ค้นหาจากตารางราคา</button>`}
+        <div class="bulk-link-results" data-idx="${idx}" style="display:none;margin-top:4px;"></div>
+      </div>
+      <button class="danger" data-remove-idx="${idx}" style="padding:4px 8px;font-size:11px;">✖</button>
+    </div>
+  `).join('');
+
+  wrap.querySelectorAll('.bulk-code').forEach(inp=>{
+    inp.oninput = ()=> bulkPending[Number(inp.dataset.idx)].code = inp.value;
+  });
+  wrap.querySelectorAll('.bulk-name').forEach(inp=>{
+    inp.oninput = ()=> bulkPending[Number(inp.dataset.idx)].name = inp.value;
+  });
+  wrap.querySelectorAll('.bulk-link').forEach(btn=>{
+    btn.onclick = ()=>{
+      const idx = Number(btn.dataset.idx);
+      const resultsDiv = wrap.querySelector(`.bulk-link-results[data-idx="${idx}"]`);
+      const opening = resultsDiv.style.display==='none';
+      resultsDiv.style.display = opening ? 'block' : 'none';
+      if(!opening) return;
+      if(priceList.length===0){
+        resultsDiv.innerHTML = '<div class="empty">ยังไม่ได้นำเข้าตารางราคา</div>';
+        return;
+      }
+      resultsDiv.innerHTML = '<input type="text" class="bulk-search-input" placeholder="พิมพ์ค้นหา..."><div class="bulk-search-list" style="max-height:140px;overflow:auto;margin-top:4px;"></div>';
+      const searchInput = resultsDiv.querySelector('.bulk-search-input');
+      const listDiv = resultsDiv.querySelector('.bulk-search-list');
+      const doSearch = (q)=>{
+        q = (q||'').toLowerCase();
+        const res = priceList.filter(r=> !q || r.code.toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q)).slice(0,30);
+        listDiv.innerHTML = res.map(r=>`<div class="price-row" data-rid="${r.id}"><b style="color:var(--accent)">${r.code}</b> ${r.name||''}</div>`).join('') || '<div class="empty">ไม่พบรายการ</div>';
+        listDiv.querySelectorAll('.price-row').forEach(el=>{
+          el.onclick = ()=>{
+            const row = priceList.find(r=>r.id===Number(el.dataset.rid));
+            bulkPending[idx].linkedRow = row;
+            bulkPending[idx].code = row.code;
+            bulkPending[idx].name = row.name;
+            renderBulkList();
+          };
+        });
+      };
+      doSearch('');
+      searchInput.oninput = ()=>doSearch(searchInput.value);
+      searchInput.focus();
+    };
+  });
+  wrap.querySelectorAll('button[data-remove-idx]').forEach(btn=>{
+    btn.onclick = ()=>{
+      bulkPending.splice(Number(btn.dataset.removeIdx),1);
+      renderBulkList();
+    };
+  });
+}
+
+document.getElementById('bulkCancel').onclick = ()=>{
+  document.getElementById('bulkModalOverlay').style.display = 'none';
+  bulkPending = [];
+};
+
+document.getElementById('bulkSaveAll').onclick = async ()=>{
+  const valid = bulkPending.filter(item=>item.code && item.code.trim());
+  if(valid.length===0){ alert('กรุณาระบุรหัสอย่างน้อย 1 รายการก่อนบันทึก'); return; }
+  for(const item of valid){
+    const sym = item.linkedRow
+      ? {code:item.linkedRow.code, name:item.linkedRow.name, unit:item.linkedRow.unit, price:item.linkedRow.price, dataURL:item.dataURL, w:item.w, h:item.h, color:randomColor()}
+      : {code:item.code.trim(), name:(item.name||'').trim(), unit:'', price:null, dataURL:item.dataURL, w:item.w, h:item.h, color:randomColor()};
+    await addSymbolToDB(sym);
+  }
+  const skipped = bulkPending.length - valid.length;
+  document.getElementById('bulkModalOverlay').style.display = 'none';
+  bulkPending = [];
+  await refreshLibraryUI();
+  alert(`บันทึกสำเร็จ ${valid.length} รายการ` + (skipped>0 ? ` (ข้าม ${skipped} รายการที่ไม่ได้ระบุรหัส)` : ''));
 };
 
 /* ============ Stage: screen share / upload plan ============ */
